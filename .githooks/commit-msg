@@ -1,7 +1,8 @@
 #!/bin/sh
 # Rejects a commit message that holds a pattern of tools/lint-patterns
 # or a trailer other than "Co-Authored-By: Claude <model>
-# <noreply@anthropic.com>". Enabled by make setup (core.hooksPath).
+# <noreply@anthropic.com>" and "Claude-Session: <https URL>", each on one
+# line. Enabled by make setup (core.hooksPath).
 # Usage (git runs it): .githooks/commit-msg <message file>
 top=$(git rev-parse --show-toplevel) || exit 2
 msg=$1
@@ -17,16 +18,20 @@ while IFS="$(printf '\t')" read -r class re; do
         sed "s/^/commit-msg: $class: line /" "$tmp/h"; bad=1
     fi
 done < "$tmp/pat"
-allowed='^Co-Authored-By: Claude [A-Za-z0-9][A-Za-z0-9. ]* <noreply@anthropic\.com>$'
+# The session trailer holds one https URL with no spaces, so that a
+# trailer with free text after the name is still refused.
+allowed='^(Co-Authored-By: Claude [A-Za-z0-9][A-Za-z0-9. ]* <noreply@anthropic\.com>|Claude-Session: https://[^[:space:]]+)$'
 git interpret-trailers --parse < "$tmp/m" > "$tmp/t"
 while IFS= read -r t; do
     if ! printf '%s\n' "$t" | grep -qE "$allowed"; then
         echo "commit-msg: trailer not allowed: $t"; bad=1
     fi
 done < "$tmp/t"
-# A trailer-like line git would not parse as a trailer still counts.
+# A trailer-like line git would not parse as a trailer still counts. The
+# allowed form must start right after grep's line number, so that another
+# line that merely ends in an allowed trailer is still refused.
 if grep -nE '^(Co-Authored-By|Claude-[A-Za-z-]*|Signed-off-by|[A-Za-z]+-[A-Za-z-]*): ' "$tmp/m" \
-    | grep -vE ":$(printf '%s' "$allowed" | sed 's/^\^//')" > "$tmp/x"; then
+    | grep -vE "^[0-9]+:$(printf '%s' "$allowed" | sed 's/^\^//')" > "$tmp/x"; then
     sed 's/^/commit-msg: trailer-like line not allowed: line /' "$tmp/x"; bad=1
 fi
 [ "$bad" = 0 ] || echo "commit-msg: message rejected"
