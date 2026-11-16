@@ -52,7 +52,7 @@ check:
 	cargo build --workspace --locked
 	cargo test --workspace --locked
 	@for s in $(SCRIPT_CHECKS); do \
-	    t=120; case $$s in tools/c_tests_[23].sh|tools/c_applet_app_19.sh|tools/read-only-run.sh) t=600;; tools/c_engine_15.sh) t=1800;; tools/c_applet_panel_15.sh) t=0;; esac; \
+	    t=120; case $$s in tools/c_tests_[23].sh|tools/c_tests_7.sh|tools/c_applet_app_19.sh|tools/read-only-run.sh) t=600;; tools/c_engine_15.sh) t=1800;; tools/c_applet_panel_15.sh) t=0;; esac; \
 	    echo "== $$s"; timeout -k 5 $$t sh "$$s" || exit 1; \
 	done
 

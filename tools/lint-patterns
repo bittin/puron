@@ -7,6 +7,15 @@ id	(^|[^A-Za-z0-9_.-])([FBDTM]-[0-9]+|Q-?[0-9]+|RB-[0-9]+|V5-[0-9]+|O5-[0-9]+|OI
 id	(^|[^A-Za-z0-9_.-])C-[a-z0-9]+(\.[a-z0-9]+)?-[0-9]+
 id	(^|[^A-Za-z0-9_.-])X-[a-z0-9]+(-[a-z0-9]+)*([^A-Za-z0-9_]|$)
 id	(^|[^A-Za-z])[Cc]riterion [0-9]
+# Numbers of the questions raised while the code is written, and the
+# names of the tags that approve a version of the design documents: the
+# word, a version number, then optionally "r" and a revision number. A
+# full stop after the name is still refused. A "+" before it and a third
+# version part after it are let through, because Cargo.lock writes the
+# versions of some dependencies that way and a commit message that bumps
+# one may quote them.
+id	(^|[^A-Za-z0-9_.-])IQ-?[0-9]+([^A-Za-z0-9_]|$)
+id	(^|[^A-Za-z0-9_+])[Ss]pec-[0-9]+\.[0-9]+(r[0-9]+)?([^A-Za-z0-9_.]|\.([^0-9]|$)|$)
 spec-ref	<SECTION-SIGN>|(^|[^A-Za-z0-9])0[0-9]-[a-z][a-z0-9-]*\.md|licenses\.md|QUESTIONS\.md|CLAUDE\.md|(^|[^A-Za-z0-9_])specs/|impl/04
 process	(^|[^A-Za-z0-9_])p[0-9][a-z][0-9]*[a-z]?([^A-Za-z0-9_]|$)|[Hh]and[ -]mutant
 home-path	/home/[A-Za-z0-9_]|(^|[^A-Za-z0-9_])~[a-z][a-z0-9_-]*|/root/|/Users/
