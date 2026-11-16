@@ -4,6 +4,18 @@ The notable changes of each Puron release. Versions follow
 [Semantic Versioning](https://semver.org/), and the format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [1.3.2] - 2026-11-16
+
+### Changed
+
+- The program itself does not change: it is the same as in 1.3.1. Only the checks that come with the source tree
+  change.
+- The commit-message hook, and tools/lint-a.sh, which checks comments and documentation, refuse more forms of
+  internal reference numbers and tag names.
+- The commit-message hook accepts one more trailer, "Claude-Session:" followed by a web address on the same line.
+- One locale test gets ten minutes instead of two, so that it passes on a cold build, which starts from an empty target
+  directory.
+
 ## [1.3.1] - 2026-11-13
 
 ### Changed
