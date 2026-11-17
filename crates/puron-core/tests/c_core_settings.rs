@@ -154,3 +154,32 @@ fn c_core_settings_5() {
         );
     });
 }
+
+#[test]
+fn c_core_settings_6() {
+    puron_testkit::limit("c_core_settings_6", LIMIT, || {
+        // Each text size against the pixel size it must give, written out
+        // here. MatchPanel has no fixed size, because its size comes from
+        // the panel or dock. Every fixed size, the smallest (10) and the
+        // largest (24) included, must give its own number of pixels, so a
+        // `fixed_px` that returns no size, or one size for all of them,
+        // fails.
+        let want = [
+            (TextSize::MatchPanel, None),
+            (TextSize::Px10, Some(10)),
+            (TextSize::Px12, Some(12)),
+            (TextSize::Px14, Some(14)),
+            (TextSize::Px16, Some(16)),
+            (TextSize::Px18, Some(18)),
+            (TextSize::Px20, Some(20)),
+            (TextSize::Px24, Some(24)),
+        ];
+        // The table holds every value of the type, in the order of the
+        // settings window, so a value added later without a row fails.
+        let sizes: Vec<TextSize> = want.iter().map(|(size, _)| *size).collect();
+        assert_eq!(sizes, TextSize::ALL.to_vec());
+        for (size, px) in want {
+            assert_eq!(size.fixed_px(), px, "{size:?}");
+        }
+    });
+}
