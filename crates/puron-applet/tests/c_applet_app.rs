@@ -992,3 +992,60 @@ fn c_applet_app_32() {
         assert_eq!(commands(&out), [Command::SetProviders(new)]);
     });
 }
+
+/// From the state of `c_applet_app_4`, a new panel text size (20 px) and
+/// then a new dock text size (10 px) arrive from the config. Neither asks
+/// the engine for anything, lays out the popup, rebuilds the panel items
+/// or logs `display-updated`; the app holds each new settings record at
+/// once. The panel button's plan at panel size M, built from the app's
+/// state, then has 20 px text on a panel after both changes, and on a dock
+/// 24 px (the match value at M) after the first and 10 px after the
+/// second.
+#[test]
+fn c_applet_app_33() {
+    use cosmic::applet::cosmic_panel_config::PanelSize;
+    use cosmic::applet::{Context, PanelType, Size as AppletSize};
+    use puron_applet::panel::{Orientation, Place};
+    use puron_applet::view::View;
+    use puron_core::settings::TextSize;
+    puron_testkit::limit("C-applet.app-33", LIMIT, || {
+        let (_c, h, mut a) = as_4();
+        let calls = h.calls().len();
+        let place = |panel_type| Place {
+            orientation: Orientation::Horizontal,
+            ..Place::of(&Context {
+                size: AppletSize::PanelSize(PanelSize::M),
+                panel_type,
+                ..Context::default()
+            })
+        };
+        let steps: [(&'static str, TextSize, u16, u16); 2] = [
+            ("panel_text_size", TextSize::Px20, 20, 24),
+            ("dock_text_size", TextSize::Px10, 20, 10),
+        ];
+        for (key, size, on_panel, on_dock) in steps {
+            let ev = delivery(&a, &[key], |s| match key {
+                "panel_text_size" => s.panel_text_size = size,
+                _ => s.dock_text_size = size,
+            });
+            let Event::Delivery(d) = &ev else {
+                unreachable!()
+            };
+            let new = d.loaded.settings.clone();
+            let out = a.handle(ev);
+            assert_eq!(commands(&out), [], "engine commands after {key}");
+            assert!(!has_layout(&out), "a layout after {key}: {out:?}");
+            assert!(panel_of(&out).is_none(), "panel items after {key}");
+            assert!(
+                !out.contains(&Output::Diag("display-updated")),
+                "display-updated after {key}"
+            );
+            assert_eq!(a.settings(), &new, "settings held after {key}");
+            let view = View::of(&a);
+            let text = |t| view.panel_plan(&place(t)).text_size;
+            assert_eq!(text(PanelType::Panel), on_panel, "on a panel after {key}");
+            assert_eq!(text(PanelType::Dock), on_dock, "on a dock after {key}");
+        }
+        assert_eq!(h.calls().len(), calls, "engine handle calls");
+    });
+}

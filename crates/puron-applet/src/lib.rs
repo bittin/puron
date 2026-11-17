@@ -7,6 +7,7 @@ pub mod i18n;
 pub mod app;
 pub mod panel;
 pub mod popup;
+pub mod view;
 
 /// Set-up that `main` runs before the toolkit starts. Today it only
 /// chooses the language of the translated texts from the environment

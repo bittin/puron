@@ -4,11 +4,13 @@
 //! It also owns the map from icon kinds to icon names, which the popup
 //! uses too.
 
-use cosmic::applet::Context;
+use cosmic::applet::{Context, PanelType};
+use cosmic::iced::alignment::Vertical;
 use cosmic::iced::{Alignment, Length, Padding};
-use cosmic::widget::{column, container, icon, row, text, Id, Space};
+use cosmic::widget::{button, column, container, icon, row, text, Id, Space};
 use puron_core::menu::{IconKind, Section};
 use puron_core::panel::{Icon, Item, Panel};
+use puron_core::settings::Settings;
 
 use crate::i18n;
 
@@ -46,6 +48,69 @@ impl Orientation {
 /// panel's size.
 pub fn icon_size(context: &Context) -> u16 {
     context.suggested_size(true).0
+}
+
+/// The smallest text size in px that the match value gives, so that the
+/// text stays readable on a very small custom panel.
+pub const MATCH_TEXT_SIZE_MIN: u16 = 8;
+
+/// The text size in px that the match value gives beside icons of
+/// `icon_size` px: seven eighths of the icon size, rounded down, and at
+/// least `MATCH_TEXT_SIZE_MIN`. At COSMIC's default panel size the icons
+/// are 16 px, which gives 14 px, the size the text always had before it
+/// could be set.
+pub fn match_text_size(icon_size: u16) -> u16 {
+    let size = u32::from(icon_size) * 7 / 8;
+    (size as u16).max(MATCH_TEXT_SIZE_MIN)
+}
+
+/// The text size in px of the panel button's texts. On a dock the dock's
+/// setting applies; on a panel, and on a panel of any other type, the
+/// panel's setting. The other setting plays no part.
+pub fn text_size(settings: &Settings, panel_type: &PanelType, icon_size: u16) -> u16 {
+    let setting = match panel_type {
+        PanelType::Dock => settings.dock_text_size,
+        PanelType::Panel | PanelType::Other(_) => settings.panel_text_size,
+    };
+    setting
+        .fixed_px()
+        .unwrap_or_else(|| match_text_size(icon_size))
+}
+
+/// Where the applet runs, as libcosmic's applet context describes it:
+/// what the panel button's plan and its button depend on besides the
+/// items and the settings.
+#[derive(Clone, Debug, PartialEq)]
+pub struct Place {
+    pub orientation: Orientation,
+    pub icon_size: u16,
+    pub panel_type: PanelType,
+    /// libcosmic's applet padding in px along the panel, inside the
+    /// button.
+    pub padding_along: u16,
+    /// libcosmic's applet padding in px across the panel, on each side of
+    /// the icons. The icon size plus twice this is the panel's thickness.
+    pub padding_across: u16,
+}
+
+impl Place {
+    /// The place that libcosmic's applet context describes.
+    pub fn of(context: &Context) -> Place {
+        let (along, across) = context.suggested_padding(true);
+        Place {
+            orientation: Orientation::of(context),
+            icon_size: icon_size(context),
+            panel_type: context.panel_type.clone(),
+            padding_along: along,
+            padding_across: across,
+        }
+    }
+
+    /// The panel's thickness in px: its size across, the icon size plus
+    /// the applet padding on both sides.
+    pub fn thickness(&self) -> u16 {
+        self.icon_size + 2 * self.padding_across
+    }
 }
 
 /// The themed icon name for an icon kind. This is the only map from kinds
@@ -108,13 +173,19 @@ pub struct Plan {
     /// `Panel::padding`.
     pub padding: u32,
     pub icon_size: u16,
+    /// The size in px of every text, `⚠` included (see [`text_size`]).
+    pub text_size: u16,
 }
 
 /// The plan for the items of `panel`. `Item::EmptyState`, shown when no
 /// pin is of a shown class, becomes the GPU temperature icon alone. A pin
 /// becomes its icon (or an empty slot, or nothing when icons are off)
-/// followed by its value text.
-pub fn plan(panel: &Panel, orientation: Orientation, icon_size: u16) -> Plan {
+/// followed by its value text. The text size comes from `settings` for
+/// the panel type of `place`, at every call, so that a new setting or a
+/// new panel size shows at the next drawing.
+pub fn plan(panel: &Panel, place: &Place, settings: &Settings) -> Plan {
+    let orientation = place.orientation;
+    let icon_size = place.icon_size;
     let mut elements = Vec::new();
     for (item, it) in panel.items.iter().enumerate() {
         match it {
@@ -146,6 +217,7 @@ pub fn plan(panel: &Panel, orientation: Orientation, icon_size: u16) -> Plan {
         },
         padding: panel.padding,
         icon_size,
+        text_size: text_size(settings, &place.panel_type, icon_size),
     }
 }
 
@@ -192,11 +264,20 @@ pub fn view<'a, M: 'a>(plan: &Plan) -> cosmic::Element<'a, M> {
             )
             .padding(around)
             .into(),
-            Element::Text { text: t, .. } => {
-                container(container(text(t.clone())).id(element_id(i)))
-                    .padding([0.0, pad])
-                    .into()
-            }
+            // The text carries its own vertical centring. A text taller
+            // than its room is drawn from the text widget's alignment, not
+            // its row's, so without it a large text would start at the
+            // top of the button and be cut only at the bottom.
+            Element::Text { text: t, .. } => container(
+                container(
+                    text(t.clone())
+                        .size(plan.text_size)
+                        .align_y(Vertical::Center),
+                )
+                .id(element_id(i)),
+            )
+            .padding([0.0, pad])
+            .into(),
         })
         .collect();
     match plan.orientation {
@@ -210,6 +291,37 @@ pub fn view<'a, M: 'a>(plan: &Plan) -> cosmic::Element<'a, M> {
             .align_x(Alignment::Center)
             .width(Length::Fill)
             .into(),
+    }
+}
+
+/// The panel button: the plan's content inside libcosmic's applet button.
+/// On a horizontal panel the button is exactly as high as the panel is
+/// thick, whatever the text size, so a text taller than the panel is cut
+/// by the panel's edge rather than making the applet taller than the
+/// panel. Its content then fills that height with no padding above or
+/// below: the elements are centred in it, so the icons sit where the
+/// applet padding would put them, and a text has the whole thickness of
+/// the panel before it is cut. On a vertical panel the button has the
+/// applet padding of `place` on all sides and takes the width of its
+/// widest element.
+pub fn button<'a, M: Clone + 'a>(
+    plan: &Plan,
+    place: &Place,
+    on_press: M,
+) -> cosmic::Element<'a, M> {
+    let (along, across) = (
+        f32::from(place.padding_along),
+        f32::from(place.padding_across),
+    );
+    let b = button::custom(view::<M>(plan))
+        .class(cosmic::theme::Button::AppletIcon)
+        .on_press(on_press);
+    match plan.orientation {
+        Orientation::Horizontal => b
+            .padding([0.0, along])
+            .height(Length::Fixed(f32::from(place.thickness())))
+            .into(),
+        Orientation::Vertical => b.padding([along, across]).into(),
     }
 }
 

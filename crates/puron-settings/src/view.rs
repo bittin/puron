@@ -61,9 +61,10 @@ fn control<'a>(n: usize, c: &'a Control) -> Element<'a, Event> {
         Control::Switch(on) => toggler(*on)
             .on_toggle(move |on| Event::Switch { item: n, on })
             .into(),
-        Control::List { items, shown } => {
-            dropdown(items.as_slice(), Some(*shown), Event::Choose).into()
-        }
+        Control::List { items, shown } => dropdown(items.as_slice(), Some(*shown), move |index| {
+            Event::Choose { item: n, index }
+        })
+        .into(),
     };
     container(widget).id(id(format!("control-{n}"))).into()
 }

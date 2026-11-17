@@ -12,7 +12,7 @@ use std::sync::mpsc;
 use std::time::Duration;
 
 use puron_config::{Config, Delivery, Problem, ProblemKind, StoreResult, Value};
-use puron_core::settings::{Settings, TemperatureUnit};
+use puron_core::settings::{Settings, TemperatureUnit, TextSize};
 use puron_testkit::cfg;
 
 const LIMIT: u64 = 5;
@@ -23,6 +23,8 @@ fn good() -> Settings {
     Settings {
         poll_interval_secs: 7,
         show_panel_icons: false,
+        panel_text_size: TextSize::Px20,
+        dock_text_size: TextSize::Px12,
         temperature_unit: TemperatureUnit::Fahrenheit,
         show_temperature_unit: false,
         show_rotation_rate_unit: false,
@@ -51,6 +53,8 @@ fn defaults() -> Settings {
     Settings {
         poll_interval_secs: 5,
         show_panel_icons: true,
+        panel_text_size: TextSize::MatchPanel,
+        dock_text_size: TextSize::MatchPanel,
         temperature_unit: TemperatureUnit::Celsius,
         show_temperature_unit: true,
         show_rotation_rate_unit: true,
@@ -79,6 +83,8 @@ fn good_values() -> Vec<(&'static str, Value)> {
     vec![
         ("poll_interval_secs", Value::U32(s.poll_interval_secs)),
         ("show_panel_icons", Value::Bool(s.show_panel_icons)),
+        ("panel_text_size", Value::TextSize(s.panel_text_size)),
+        ("dock_text_size", Value::TextSize(s.dock_text_size)),
         (
             "temperature_unit",
             Value::TemperatureUnit(s.temperature_unit),
@@ -162,7 +168,7 @@ fn watch(config: &Config) -> (puron_config::Watch, mpsc::Receiver<Delivery>) {
 }
 
 /// The `good` fixture, which holds a usable entry for every key, loads as
-/// exactly those values with no problem. `KEYS` has the 20 keys, in the
+/// exactly those values with no problem. `KEYS` has the 22 keys, in the
 /// order of `good_values`.
 #[test]
 fn c_config_1() {
@@ -171,7 +177,7 @@ fn c_config_1() {
         let loaded = Config::new(&fx.root).load();
         assert_eq!(loaded.settings, good());
         assert_eq!(loaded.problems, vec![]);
-        assert_eq!(puron_config::KEYS.len(), 20);
+        assert_eq!(puron_config::KEYS.len(), 22);
         let stored: Vec<&str> = good_values().iter().map(|(key, _)| *key).collect();
         assert_eq!(stored, puron_config::KEYS);
 
@@ -533,5 +539,80 @@ fn c_config_11__a() {
 fn c_config_11__b() {
     puron_testkit::limit("C-config-11", LIMIT, || {
         c_config_11_case("c_config_11__b", "sysdefault-b")
+    });
+}
+
+/// The names under which the text sizes are stored, in the order of
+/// `TextSize::ALL`, written out here so that a renamed variant fails.
+const TEXT_SIZE_NAMES: [&str; 8] = [
+    "MatchPanel",
+    "Px10",
+    "Px12",
+    "Px14",
+    "Px16",
+    "Px18",
+    "Px20",
+    "Px24",
+];
+
+/// Each of the eight text sizes, stored alone into `panel_text_size` and
+/// then into `dock_text_size` of an empty settings directory, is written
+/// as exactly its variant name and loads back for that key, while the
+/// other, absent key loads as the match value. Then each of six
+/// hand-written contents that are not a variant name exactly (a default
+/// name, an unknown size, a bare number, a quoted name, lower case and an
+/// unknown word) in `panel_text_size` of the `good` fixture loads as the
+/// match value with one `WrongType` problem, leaves `dock_text_size` at
+/// the fixture's value, and is not rewritten.
+#[test]
+fn c_config_12() {
+    puron_testkit::limit("C-config-12", LIMIT, || {
+        for (size, name) in TextSize::ALL.into_iter().zip(TEXT_SIZE_NAMES) {
+            for (key, other) in [
+                ("panel_text_size", "dock_text_size"),
+                ("dock_text_size", "panel_text_size"),
+            ] {
+                let fx = cfg::build("empty-none");
+                let config = Config::new(&fx.root);
+                assert_eq!(
+                    config.store(key, &Value::TextSize(size)),
+                    StoreResult::Stored,
+                    "store {name} into {key}"
+                );
+                assert_eq!(
+                    String::from_utf8_lossy(&fx.entry(key)),
+                    name,
+                    "entry of {key}"
+                );
+                let loaded = config.load();
+                let s = &loaded.settings;
+                let (got, rest) = if key == "panel_text_size" {
+                    (s.panel_text_size, s.dock_text_size)
+                } else {
+                    (s.dock_text_size, s.panel_text_size)
+                };
+                assert_eq!(got, size, "{key} after storing {name}");
+                assert_eq!(rest, TextSize::MatchPanel, "{other}, absent");
+                assert_eq!(loaded.problems, vec![], "problems after {name}");
+            }
+        }
+        for content in ["Default", "Px15", "14", "\"Px20\"", "px20", "Huge"] {
+            let fx = cfg::build("good");
+            cfg::write(&fx.id_dir().join("panel_text_size"), content.as_bytes());
+            let before = fx.entry("panel_text_size");
+            let loaded = Config::new(&fx.root).load();
+            assert_eq!(
+                loaded.settings.panel_text_size,
+                TextSize::MatchPanel,
+                "{content}"
+            );
+            assert_eq!(loaded.settings.dock_text_size, TextSize::Px12, "{content}");
+            assert_eq!(
+                loaded.problems,
+                vec![problem("panel_text_size", ProblemKind::WrongType)],
+                "{content}"
+            );
+            assert_eq!(fx.entry("panel_text_size"), before, "{content} rewritten");
+        }
     });
 }

@@ -509,7 +509,9 @@ impl App {
     /// asks for one lays out at once instead. A
     /// change of whether unit suffixes are shown lays out at once. A change
     /// of the panel icons, or a pinned list taken from another process
-    /// during `NewInstall`, rebuilds only the panel.
+    /// during `NewInstall`, rebuilds only the panel. A change of a text
+    /// size needs nothing here: the panel button reads it from the
+    /// settings at its next drawing, which the new settings cause.
     fn delivery(&mut self, d: Delivery, out: &mut Vec<Output>) {
         // A list written from outside during a new install is taken as a
         // stored one, so that a click builds on it instead of replacing it.

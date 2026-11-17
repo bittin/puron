@@ -16,7 +16,7 @@ use std::io::ErrorKind;
 use std::path::PathBuf;
 
 use cosmic_config::{ConfigGet, ConfigSet};
-use puron_core::settings::{self, Settings, Stored, TemperatureUnit};
+use puron_core::settings::{self, Settings, Stored, TemperatureUnit, TextSize};
 
 /// The cosmic-config ID under which the settings are stored. It is also
 /// the name of the settings directory.
@@ -30,6 +30,8 @@ pub const VERSION: u64 = 1;
 /// stores.
 pub const POLL_INTERVAL_SECS: &str = "poll_interval_secs";
 pub const SHOW_PANEL_ICONS: &str = "show_panel_icons";
+pub const PANEL_TEXT_SIZE: &str = "panel_text_size";
+pub const DOCK_TEXT_SIZE: &str = "dock_text_size";
 pub const TEMPERATURE_UNIT: &str = "temperature_unit";
 pub const SHOW_TEMPERATURE_UNIT: &str = "show_temperature_unit";
 pub const SHOW_ROTATION_RATE_UNIT: &str = "show_rotation_rate_unit";
@@ -58,9 +60,11 @@ const OLD_CPU_ROW: &str = "@cpu";
 
 /// Every key that `load` reads, `store` accepts and `watch` reports, in
 /// the field order of `Settings`. Problems are reported in this order.
-pub const KEYS: [&str; 20] = [
+pub const KEYS: [&str; 22] = [
     POLL_INTERVAL_SECS,
     SHOW_PANEL_ICONS,
+    PANEL_TEXT_SIZE,
+    DOCK_TEXT_SIZE,
     TEMPERATURE_UNIT,
     SHOW_TEMPERATURE_UNIT,
     SHOW_ROTATION_RATE_UNIT,
@@ -116,13 +120,14 @@ pub struct Loaded {
 
 /// A value to store with `Config::store`. The variant must match the
 /// key's type: `U32` for `poll_interval_secs`, `TemperatureUnit` for
-/// `temperature_unit`, `List` for `pinned`, and `Bool` for every other
-/// key.
+/// `temperature_unit`, `TextSize` for `panel_text_size` and
+/// `dock_text_size`, `List` for `pinned`, and `Bool` for every other key.
 #[derive(Clone, Debug, PartialEq)]
 pub enum Value {
     Bool(bool),
     U32(u32),
     TemperatureUnit(TemperatureUnit),
+    TextSize(TextSize),
     List(Vec<String>),
 }
 
@@ -203,6 +208,8 @@ impl Config {
         let stored = Stored {
             poll_interval_secs: r.poll_interval(),
             show_panel_icons: r.bool(SHOW_PANEL_ICONS),
+            panel_text_size: r.text_size(PANEL_TEXT_SIZE),
+            dock_text_size: r.text_size(DOCK_TEXT_SIZE),
             temperature_unit: r.unit(TEMPERATURE_UNIT),
             show_temperature_unit: r.bool(SHOW_TEMPERATURE_UNIT),
             show_rotation_rate_unit: r.bool(SHOW_ROTATION_RATE_UNIT),
@@ -240,8 +247,12 @@ impl Config {
         let typed = match (key, value) {
             (POLL_INTERVAL_SECS, Value::U32(_))
             | (TEMPERATURE_UNIT, Value::TemperatureUnit(_))
+            | (PANEL_TEXT_SIZE | DOCK_TEXT_SIZE, Value::TextSize(_))
             | (PINNED, Value::List(_)) => true,
-            (POLL_INTERVAL_SECS | TEMPERATURE_UNIT | PINNED, _) => false,
+            (
+                POLL_INTERVAL_SECS | TEMPERATURE_UNIT | PANEL_TEXT_SIZE | DOCK_TEXT_SIZE | PINNED,
+                _,
+            ) => false,
             (_, value) => matches!(value, Value::Bool(_)),
         };
         if !typed {
@@ -261,6 +272,7 @@ impl Config {
             Value::Bool(v) => config.set(key, v),
             Value::U32(v) => config.set(key, v),
             Value::TemperatureUnit(v) => config.set(key, v),
+            Value::TextSize(v) => config.set(key, v),
             Value::List(v) => config.set(key, v),
         };
         match result {
@@ -359,6 +371,13 @@ impl Reader {
 
     fn unit(&mut self, key: &'static str) -> Option<TemperatureUnit> {
         let read = self.config.get_local::<TemperatureUnit>(key);
+        self.usable(key, read)
+    }
+
+    /// A text size is read by its exact variant name; any other content,
+    /// a number or a quoted name included, is of the wrong type.
+    fn text_size(&mut self, key: &'static str) -> Option<TextSize> {
+        let read = self.config.get_local::<TextSize>(key);
         self.usable(key, read)
     }
 

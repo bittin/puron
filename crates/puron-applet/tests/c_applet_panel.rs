@@ -1,6 +1,8 @@
 //! Tests of the panel button, each with a time limit of 5 s. Some check
 //! the panel plan alone; others lay out the widgets built from the plan
-//! in iced's headless test simulator, at panel size M, and measure them.
+//! in iced's headless test simulator and measure them. Unless a test says
+//! otherwise, the panel is of type Panel, at size M, and the text size is
+//! the default, the match value.
 //! Unless a test says otherwise, the items come from
 //! `puron_core::panel::panel` with the captured readings and the pinned
 //! list `P1` of `pins.json`. The icon theme test runs in a fresh run of
@@ -12,17 +14,19 @@ use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
 use cosmic::applet::cosmic_panel_config::PanelSize;
-use cosmic::applet::{Context, Size as AppletSize};
+use cosmic::applet::{Context, PanelType, Size as AppletSize};
 use cosmic::iced::theme::Base;
 use cosmic::iced::{Length, Rectangle, Size};
 use cosmic::widget::{container, Id};
 use cosmic::Theme;
 use iced_test::{selector, Simulator};
-use puron_applet::panel::{self, Element, Orientation, Plan};
+use puron_applet::panel::{self, Element, Orientation, Place, Plan};
+use puron_config::Config;
 use puron_core::menu;
 use puron_core::panel::{Panel, State};
 use puron_core::rows::RawReading;
-use puron_core::settings::Settings;
+use puron_core::settings::{Settings, TextSize};
+use puron_testkit::cfg;
 
 const LIMIT: u64 = 5;
 const CHILD: &str = "PURON_PANEL_CHILD";
@@ -67,22 +71,33 @@ fn core_panel(raw: &[RawReading], pins: &[String], icons: bool) -> Panel {
     puron_core::panel::panel(&menu::shown(raw, &s), pins, &s, &State::default())
 }
 
-/// An applet context at panel size M. The size is set here, so the
-/// environment cannot change it.
-fn context() -> Context {
-    Context {
-        size: AppletSize::PanelSize(PanelSize::M),
-        ..Context::default()
-    }
-}
-
 /// The icon size in px that libcosmic gives for panel size M.
 fn m_icon_size() -> f32 {
     PanelSize::M.get_applet_icon_size(true) as f32
 }
 
+/// Where the button is drawn in most tests: panel size M, on a panel of
+/// type Panel, in orientation `o`.
+fn m_place(o: Orientation) -> Place {
+    place(PanelSize::M, PanelType::Panel, o)
+}
+
+/// The place that libcosmic's context gives for a panel of `size` and
+/// `panel_type`, in orientation `o`. Size and type are set here, so the
+/// environment cannot change them.
+fn place(size: PanelSize, panel_type: PanelType, o: Orientation) -> Place {
+    Place {
+        orientation: o,
+        ..Place::of(&Context {
+            size: AppletSize::PanelSize(size),
+            panel_type,
+            ..Context::default()
+        })
+    }
+}
+
 fn plan_of(p: &Panel, o: Orientation) -> Plan {
-    panel::plan(p, o, panel::icon_size(&context()))
+    panel::plan(p, &m_place(o), &Settings::default())
 }
 
 fn p1_plan(icons: bool, o: Orientation) -> Plan {
@@ -570,5 +585,372 @@ fn c_applet_panel_16() {
             (4, 3),
             "P1's icon-to-text and text-to-icon gaps"
         );
+    });
+}
+
+/// The eight text sizes in the order the settings list them, written out
+/// here so that a reordered list in the code fails.
+const SIZES: [TextSize; 8] = [
+    TextSize::MatchPanel,
+    TextSize::Px10,
+    TextSize::Px12,
+    TextSize::Px14,
+    TextSize::Px16,
+    TextSize::Px18,
+    TextSize::Px20,
+    TextSize::Px24,
+];
+
+/// COSMIC's five panel sizes, smallest first.
+const PANEL_SIZES: [PanelSize; 5] = [
+    PanelSize::XS,
+    PanelSize::S,
+    PanelSize::M,
+    PanelSize::L,
+    PanelSize::XL,
+];
+
+/// The default settings with icons on and the two text sizes `panel` and
+/// `dock`.
+fn sized(panel: TextSize, dock: TextSize) -> Settings {
+    Settings {
+        panel_text_size: panel,
+        dock_text_size: dock,
+        ..settings(true)
+    }
+}
+
+/// The plan of the items of P1 with icons on, at `place`, with `s`.
+fn p1_at(place: &Place, s: &Settings) -> Plan {
+    panel::plan(&core_panel(&capture(), &pinned("P1"), true), place, s)
+}
+
+/// A horizontal place on a panel of type Panel at `size`.
+fn h_panel(size: PanelSize) -> Place {
+    place(size, PanelType::Panel, Orientation::Horizontal)
+}
+
+/// A simulator holding the button's content alone, without the button,
+/// in a viewport 2000 × 200 px, so that nothing around the content limits
+/// the size of its texts.
+fn content_alone(plan: &Plan) -> Sim {
+    let content = container(panel::view::<()>(plan)).id(Id::new("root"));
+    Simulator::with_size(Default::default(), Size::new(2000.0, 200.0), content)
+}
+
+/// A simulator holding the panel button itself, as the applet draws it at
+/// `place`, in a viewport 2000 × 200 px. Its rectangle has the ID
+/// `button`.
+fn in_button(plan: &Plan, place: &Place) -> Sim {
+    let b = container(panel::button(plan, place, ())).id(Id::new("button"));
+    Simulator::with_size(Default::default(), Size::new(2000.0, 200.0), b)
+}
+
+/// The rectangles of the plan's text elements, in plan order.
+fn text_rects(sim: &mut Sim, plan: &Plan) -> Vec<Rectangle> {
+    let r = rects(sim, plan);
+    plan.elements
+        .iter()
+        .zip(r)
+        .filter(|(e, _)| is_text(e))
+        .map(|(_, r)| r)
+        .collect()
+}
+
+/// The height of the `CPU` pin's value text, the first text of P1, which
+/// the popup's order puts first.
+fn cpu_height(sim: &mut Sim, plan: &Plan) -> f32 {
+    text_rects(sim, plan)[0].height
+}
+
+fn mid_y(r: &Rectangle) -> f32 {
+    r.y + r.height / 2.0
+}
+
+fn mid_x(r: &Rectangle) -> f32 {
+    r.x + r.width / 2.0
+}
+
+/// On a panel of type Panel at size S (icon 20 px), with the dock's size
+/// fixed at 10 px, each of the eight panel text sizes in turn gives the
+/// plan a text size of 17 (the match value), 10, 12, 14, 16, 18, 20 and
+/// 24 px. Then, with no readings and the pins of P5 at size M, both "⚠"
+/// texts are higher at 20 px than at 10 px.
+#[test]
+fn c_applet_panel_17() {
+    puron_testkit::limit("C-applet.panel-17", LIMIT, || {
+        let s_place = h_panel(PanelSize::S);
+        assert_eq!(s_place.icon_size, 20, "icon size at S");
+        let got: Vec<u16> = SIZES
+            .iter()
+            .map(|&t| p1_at(&s_place, &sized(t, TextSize::Px10)).text_size)
+            .collect();
+        assert_eq!(got, [17, 10, 12, 14, 16, 18, 20, 24], "text sizes");
+
+        let p5 = core_panel(&[], &pinned("P5"), true);
+        let heights = |t: TextSize| -> Vec<f32> {
+            let plan = panel::plan(&p5, &m_place(Orientation::Horizontal), &sized(t, t));
+            assert_eq!(kinds(&plan), ["0 slot", "0 text ⚠", "1 slot", "1 text ⚠"]);
+            let mut sim = simulate(&plan);
+            text_rects(&mut sim, &plan)
+                .iter()
+                .map(|r| r.height)
+                .collect()
+        };
+        let (big, small) = (heights(TextSize::Px20), heights(TextSize::Px10));
+        assert_eq!(big.len(), 2, "two ⚠ texts");
+        for i in 0..2 {
+            assert!(
+                big[i] > small[i],
+                "⚠ {i}: {} at 20 px, {} at 10 px",
+                big[i],
+                small[i]
+            );
+        }
+    });
+}
+
+/// At size S (icon 20 px) on a dock, with the panel's size fixed at
+/// 24 px, each of the eight dock text sizes gives 17, 10, 12, 14, 16, 18,
+/// 20 and 24 px. On a panel of another type, named "Panel 2", with 20 px
+/// for panels and 10 px for docks, the panel's setting applies: 20 px.
+#[test]
+fn c_applet_panel_18() {
+    puron_testkit::limit("C-applet.panel-18", LIMIT, || {
+        let dock = place(PanelSize::S, PanelType::Dock, Orientation::Horizontal);
+        let got: Vec<u16> = SIZES
+            .iter()
+            .map(|&t| p1_at(&dock, &sized(TextSize::Px24, t)).text_size)
+            .collect();
+        assert_eq!(got, [17, 10, 12, 14, 16, 18, 20, 24], "on a dock");
+        let other = place(
+            PanelSize::S,
+            PanelType::Other("Panel 2".to_string()),
+            Orientation::Horizontal,
+        );
+        let plan = p1_at(&other, &sized(TextSize::Px20, TextSize::Px10));
+        assert_eq!(plan.text_size, 20, "on a panel of another type");
+    });
+}
+
+/// With the match value on a panel, the icon size that libcosmic gives
+/// for the sizes XS, S, M, L and XL and for the custom sizes 16, 40 and
+/// 100 is 16, 20, 28, 32, 48, 8, 20 and 50 px, and the text size is seven
+/// eighths of it rounded down, at least 8: 14, 17, 24, 28, 42, 8, 17 and
+/// 43 px.
+#[test]
+fn c_applet_panel_19() {
+    puron_testkit::limit("C-applet.panel-19", LIMIT, || {
+        let sizes = PANEL_SIZES.into_iter().chain([
+            PanelSize::Custom(16),
+            PanelSize::Custom(40),
+            PanelSize::Custom(100),
+        ]);
+        let s = sized(TextSize::MatchPanel, TextSize::Px10);
+        let (icons, texts): (Vec<u16>, Vec<u16>) = sizes
+            .map(|size| {
+                let plan = p1_at(&h_panel(size), &s);
+                (plan.icon_size, plan.text_size)
+            })
+            .unzip();
+        assert_eq!(icons, [16, 20, 28, 32, 48, 8, 20, 50], "icon sizes");
+        assert_eq!(texts, [14, 17, 24, 28, 42, 8, 17, 43], "text sizes");
+    });
+}
+
+/// With the match value, icons on, on a horizontal panel at each size XS
+/// to XL: the panel is 32, 40, 56, 64 and 80 px thick; laid out alone,
+/// each text of the content is no higher than that, and the `CPU` text
+/// grows strictly from size to size; in the button, each text's vertical
+/// centre is within 1 px of the button's.
+#[test]
+fn c_applet_panel_20() {
+    puron_testkit::limit("C-applet.panel-20", LIMIT, || {
+        let s = sized(TextSize::MatchPanel, TextSize::Px10);
+        let mut last = 0.0;
+        for (size, thick) in PANEL_SIZES.into_iter().zip([32.0, 40.0, 56.0, 64.0, 80.0]) {
+            let place = h_panel(size.clone());
+            assert_eq!(f32::from(place.thickness()), thick, "thickness at {size:?}");
+            let plan = p1_at(&place, &s);
+            let mut sim = content_alone(&plan);
+            let texts = text_rects(&mut sim, &plan);
+            assert_eq!(texts.len(), 4, "four texts in P1");
+            for (i, r) in texts.iter().enumerate() {
+                assert!(r.height <= thick, "{size:?} text {i} height {}", r.height);
+            }
+            let cpu = texts[0].height;
+            assert!(cpu > last, "{size:?}: CPU text {cpu}, before {last}");
+            last = cpu;
+
+            let mut sim = in_button(&plan, &place);
+            let button = bounds(&mut sim, Id::new("button"));
+            for (i, r) in text_rects(&mut sim, &plan).iter().enumerate() {
+                assert!(
+                    near(mid_y(r), mid_y(&button), 1.0),
+                    "{size:?} text {i} centre {}, button {}",
+                    mid_y(r),
+                    mid_y(&button)
+                );
+            }
+        }
+    });
+}
+
+/// A fixed 24 px text is not fitted to the panel. On the custom size 16
+/// (icon 8 px, 16 px thick) and at XL the plan keeps 24 px, and the
+/// button at custom 16 stays 16 px high. In the button, the `CPU` text at
+/// 24 px is as high at L as at XL, where it fits, and at each of them
+/// higher than at 20 px. Laid out alone, the content's `CPU` text at
+/// 24 px is as high at custom 16 as at XL.
+#[test]
+fn c_applet_panel_21() {
+    puron_testkit::limit("C-applet.panel-21", LIMIT, || {
+        let px24 = sized(TextSize::Px24, TextSize::Px10);
+        let px20 = sized(TextSize::Px20, TextSize::Px10);
+        let tiny = h_panel(PanelSize::Custom(16));
+        assert_eq!((tiny.icon_size, tiny.thickness()), (8, 16), "custom 16");
+        let (l, xl) = (h_panel(PanelSize::L), h_panel(PanelSize::XL));
+        assert_eq!(p1_at(&tiny, &px24).text_size, 24, "plan at custom 16");
+        assert_eq!(p1_at(&xl, &px24).text_size, 24, "plan at XL");
+
+        let in_btn = |place: &Place, s: &Settings| -> f32 {
+            let plan = p1_at(place, s);
+            cpu_height(&mut in_button(&plan, place), &plan)
+        };
+        let (l24, xl24) = (in_btn(&l, &px24), in_btn(&xl, &px24));
+        assert!(near(l24, xl24, 0.5), "24 px: {l24} at L, {xl24} at XL");
+        assert!(l24 > in_btn(&l, &px20), "L: 24 px against 20 px");
+        assert!(xl24 > in_btn(&xl, &px20), "XL: 24 px against 20 px");
+
+        let plan = p1_at(&tiny, &px24);
+        let mut sim = in_button(&plan, &tiny);
+        let h = bounds(&mut sim, Id::new("button")).height;
+        assert!(near(h, 16.0, 0.5), "button height {h} at custom 16");
+
+        let alone = |place: &Place| -> f32 {
+            let plan = p1_at(place, &px24);
+            cpu_height(&mut content_alone(&plan), &plan)
+        };
+        let (a16, axl) = (alone(&tiny), alone(&xl));
+        assert!(
+            near(a16, axl, 0.5),
+            "alone: {a16} at custom 16, {axl} at XL"
+        );
+    });
+}
+
+/// At size M with icons on, the text sizes 14, 24 and 10 px change the
+/// plan only in its text size; in each, every icon is the icon size wide
+/// and high, and 9 px separate each icon from its text and each text from
+/// the next icon.
+#[test]
+fn c_applet_panel_22() {
+    puron_testkit::limit("C-applet.panel-22", LIMIT, || {
+        let place = m_place(Orientation::Horizontal);
+        let plans: Vec<Plan> = [TextSize::Px14, TextSize::Px24, TextSize::Px10]
+            .iter()
+            .map(|&t| p1_at(&place, &sized(t, TextSize::Px20)))
+            .collect();
+        assert_eq!(
+            plans.iter().map(|p| p.text_size).collect::<Vec<_>>(),
+            [14, 24, 10]
+        );
+        for p in &plans[1..] {
+            let same = Plan {
+                text_size: plans[0].text_size,
+                ..p.clone()
+            };
+            assert_eq!(same, plans[0], "plans differ in more than the text size");
+        }
+        let size = m_icon_size();
+        for plan in &plans {
+            let t = plan.text_size;
+            let mut sim = simulate(plan);
+            let r = rects(&mut sim, plan);
+            for (i, e) in plan.elements.iter().enumerate() {
+                if is_text(e) {
+                    continue;
+                }
+                assert!(near(r[i].width, size, 0.5), "{t} px: icon {i} width");
+                assert!(near(r[i].height, size, 0.5), "{t} px: icon {i} height");
+                let gap = r[i + 1].x - (r[i].x + r[i].width);
+                assert!(near(gap, 9.0, 0.5), "{t} px: icon {i} to text {gap}");
+                if i > 0 {
+                    let gap = r[i].x - (r[i - 1].x + r[i - 1].width);
+                    assert!(near(gap, 9.0, 0.5), "{t} px: text to icon {i} {gap}");
+                }
+            }
+        }
+    });
+}
+
+/// Settings loaded from a store written by the previous version (every
+/// other key of the `good` fixture, no text size entry), from an empty
+/// store, and from a store whose text size entries hold `Default` and
+/// `24`, all give the match value: on a panel and on a dock, 14 px at XS,
+/// 24 px at M and 42 px at XL, in all 18 plans.
+#[test]
+fn c_applet_panel_23() {
+    puron_testkit::limit("C-applet.panel-23", LIMIT, || {
+        let update = cfg::build("good");
+        for key in ["panel_text_size", "dock_text_size"] {
+            std::fs::remove_file(update.id_dir().join(key)).expect("remove entry");
+        }
+        let empty = cfg::build("empty-none");
+        let unusable = cfg::build("empty-none");
+        cfg::write(&unusable.id_dir().join("panel_text_size"), b"Default");
+        cfg::write(&unusable.id_dir().join("dock_text_size"), b"24");
+        let mut n = 0;
+        for (name, fx) in [
+            ("update", &update),
+            ("empty", &empty),
+            ("unusable", &unusable),
+        ] {
+            let s = Config::new(&fx.root).load().settings;
+            for panel_type in [PanelType::Panel, PanelType::Dock] {
+                for (size, want) in [(PanelSize::XS, 14), (PanelSize::M, 24), (PanelSize::XL, 42)] {
+                    let at = place(size.clone(), panel_type.clone(), Orientation::Horizontal);
+                    let got = panel::plan(&core_panel(&capture(), &pinned("P1"), true), &at, &s);
+                    assert_eq!(got.text_size, want, "{name}, {panel_type:?}, {size:?}");
+                    n += 1;
+                }
+            }
+        }
+        assert_eq!(n, 18, "plans");
+    });
+}
+
+/// On a vertical panel at size M with icons on, 24 px and then 10 px give
+/// plans down the panel with those text sizes. In each, every element
+/// starts below the end of the one before and is centred across the
+/// button within 1 px, and the `CPU` text is higher at 24 px than at
+/// 10 px.
+#[test]
+fn c_applet_panel_24() {
+    puron_testkit::limit("C-applet.panel-24", LIMIT, || {
+        let place = m_place(Orientation::Vertical);
+        let mut heights = Vec::new();
+        for (t, want) in [(TextSize::Px24, 24), (TextSize::Px10, 10)] {
+            let plan = p1_at(&place, &sized(t, TextSize::Px20));
+            assert_eq!(plan.orientation, Orientation::Vertical);
+            assert_eq!(plan.text_size, want);
+            let mut sim = simulate(&plan);
+            let root = bounds(&mut sim, Id::new("root"));
+            let r = rects(&mut sim, &plan);
+            for i in 0..r.len() {
+                if i > 0 {
+                    let above = r[i - 1].y + r[i - 1].height;
+                    assert!(r[i].y >= above, "{want} px: element {i} top above {above}");
+                }
+                assert!(
+                    near(mid_x(&r[i]), mid_x(&root), 1.0),
+                    "{want} px: element {i} centre {}, button {}",
+                    mid_x(&r[i]),
+                    mid_x(&root)
+                );
+            }
+            heights.push(cpu_height(&mut sim, &plan));
+        }
+        assert!(heights[0] > heights[1], "CPU text heights {heights:?}");
     });
 }

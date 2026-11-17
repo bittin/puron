@@ -235,7 +235,7 @@ fn c_settings_window_18() {
 }
 
 /// In each section the heading is above the first item, each item is
-/// below the one before, and there are 18 items in all.
+/// below the one before, and there are 20 items in all.
 #[test]
 fn c_settings_window_19() {
     puron_testkit::limit("C-settings.window-19", LIMIT, || {
@@ -257,7 +257,7 @@ fn c_settings_window_19() {
                 above = r.y + r.height;
             }
         }
-        assert_eq!(n, 18, "items");
+        assert_eq!(n, 20, "items");
     });
 }
 
@@ -404,10 +404,10 @@ fn c_settings_window_26() {
         let mut sim = sim(&plan, 480.0);
         let t = scroll_to_end(&mut sim);
         let (area, _) = scroll(&mut sim);
-        let last = shifted(item(&mut sim, 18), t);
+        let last = shifted(item(&mut sim, 20), t);
         assert!(
             inside(last, area),
-            "end: item 18 {last:?} t {t:?} area {area:?}"
+            "end: item 20 {last:?} t {t:?} area {area:?}"
         );
         let mut top = self::sim(&plan, 480.0);
         let (area, t) = scroll(&mut top);
@@ -469,28 +469,28 @@ fn hovered(plan: &Plan, at: Point, tag: &str) -> (u32, u32, Vec<u8>) {
     pixels(&mut sim, tag)
 }
 
-/// The tooltip belongs to the whole item row. Hovering item 8's label, or
+/// The tooltip belongs to the whole item row. Hovering item 10's label, or
 /// its switch, changes pixels outside the switch, where the tooltip is
-/// drawn. Item 11 has no tooltip, so hovering its label changes no pixel.
+/// drawn. Item 13 has no tooltip, so hovering its label changes no pixel.
 #[test]
 fn c_settings_window_27() {
     puron_testkit::limit("C-settings.window-27", LIMIT, || {
         let plan = plan();
         let mut first = sim(&plan, 480.0);
         let base = pixels(&mut first, "base");
-        let label8 = label(&mut first, &plan, 8).center();
-        let control8 = control(&mut first, 8);
-        let label11 = label(&mut first, &plan, 11).center();
-        for (what, at) in [("label", label8), ("switch", control8.center())] {
+        let label10 = label(&mut first, &plan, 10).center();
+        let control10 = control(&mut first, 10);
+        let label13 = label(&mut first, &plan, 13).center();
+        for (what, at) in [("label", label10), ("switch", control10.center())] {
             let after = hovered(&plan, at, what);
-            let n = changed(&base, &after, Some(control8));
+            let n = changed(&base, &after, Some(control10));
             assert!(
                 n > 0,
-                "item 8 {what} hover at {at:?}: no pixel changed outside {control8:?}"
+                "item 10 {what} hover at {at:?}: no pixel changed outside {control10:?}"
             );
         }
-        let after = hovered(&plan, label11, "item11");
+        let after = hovered(&plan, label13, "item13");
         let n = changed(&base, &after, None);
-        assert_eq!(n, 0, "item 11 hover at {label11:?}: {n} pixels changed");
+        assert_eq!(n, 0, "item 13 hover at {label13:?}: {n} pixels changed");
     });
 }

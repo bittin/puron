@@ -14,7 +14,7 @@ use std::sync::mpsc;
 use std::time::Duration;
 
 use puron_config::{Config, Delivery, StoreResult, Value};
-use puron_core::settings::TemperatureUnit;
+use puron_core::settings::{TemperatureUnit, TextSize};
 use puron_settings::window::{window_settings, Control, Event, Output, Plan, Window};
 use puron_testkit::cfg::{self, Cfg};
 
@@ -124,7 +124,7 @@ fn items(plan: &Plan) -> Vec<&puron_settings::window::Item> {
     plan.sections.iter().flat_map(|s| s.items.iter()).collect()
 }
 
-/// Item number `n` (1 to 18) of `plan`.
+/// Item number `n` (1 to 20) of `plan`.
 fn item(plan: &Plan, n: usize) -> puron_settings::window::Item {
     items(plan)[n - 1].clone()
 }
@@ -184,20 +184,38 @@ fn grep_count(pattern: &str) -> String {
 }
 
 /// What each item shows when nothing is stored, in item order.
-const DEFAULTS: [&str; 18] = [
-    "5", "on", "°C", "on", "on", "on", "on", "off", "on", "off", "off", "on", "off", "off", "on",
-    "on", "on", "on",
+const DEFAULTS: [&str; 20] = [
+    "5",
+    "on",
+    "Match panel size",
+    "Match dock size",
+    "°C",
+    "on",
+    "on",
+    "on",
+    "on",
+    "off",
+    "on",
+    "off",
+    "off",
+    "on",
+    "off",
+    "off",
+    "on",
+    "on",
+    "on",
+    "on",
 ];
 /// What each item shows for the `good` fixture, in item order. Every value
 /// differs from its default.
-const GOOD: [&str; 18] = [
-    "7", "off", "°F", "off", "off", "off", "off", "on", "off", "on", "on", "off", "on", "on",
-    "off", "off", "off", "off",
+const GOOD: [&str; 20] = [
+    "7", "off", "20 px", "12 px", "°F", "off", "off", "off", "off", "on", "off", "on", "on", "off",
+    "on", "on", "off", "off", "off", "off",
 ];
 
 /// The plan's layout (each item's heading, label, control kind, key and
 /// tooltip ID) matches the expected table `c_settings_window_1.tsv` line
-/// for line, with five sections and 18 items.
+/// for line, with five sections and 20 items.
 #[test]
 fn c_settings_window_1() {
     puron_testkit::limit("C-settings.window-1", LIMIT, || {
@@ -230,7 +248,7 @@ fn c_settings_window_1() {
             String::from_utf8_lossy(&out.stdout)
         );
         assert_eq!(plan.sections.len(), 5, "five headings");
-        assert_eq!(items(&plan).len(), 18, "eighteen items");
+        assert_eq!(items(&plan).len(), 20, "twenty items");
     });
 }
 
@@ -269,12 +287,12 @@ fn c_settings_window_3() {
         let mut after = fx.tree();
         after.remove(&key);
         assert_eq!(after, before, "entries other than show_voltage, none added");
-        assert!(switch_of(&plan, 18), "show_power shown on");
-        assert_eq!(shown(&plan)[2], "°C", "temperature_unit shown");
+        assert!(switch_of(&plan, 20), "show_power shown on");
+        assert_eq!(shown(&plan)[4], "°C", "temperature_unit shown");
     });
 }
 
-/// The keys of the 16 switches (items 2 and 4 to 18), in item order.
+/// The keys of the 16 switches (items 2 and 6 to 20), in item order.
 const SWITCH_KEYS: [&str; 16] = [
     "show_panel_icons",
     "show_temperature_unit",
@@ -302,7 +320,7 @@ fn c_settings_window_4() {
     puron_testkit::limit("C-settings.window-4", LIMIT, || {
         let fx = cfg::build("empty-none");
         let mut w = open(&fx);
-        let switches: Vec<usize> = std::iter::once(2).chain(4..=18).collect();
+        let switches: Vec<usize> = std::iter::once(2).chain(6..=20).collect();
         let mut out = Vec::new();
         for &n in &switches {
             out.extend(toggle(&mut w, n));
@@ -337,13 +355,14 @@ fn c_settings_window_5() {
     puron_testkit::limit("C-settings.window-5", LIMIT, || {
         let fx = cfg::build("empty-none");
         let mut w = open(&fx);
-        match item(&w.plan(), 3).control {
+        match item(&w.plan(), 5).control {
             Control::List { items, .. } => assert_eq!(items, ["°C", "°F"], "suffix- entries"),
-            c => panic!("item 3: {c:?}"),
+            c => panic!("item 5: {c:?}"),
         }
-        let mut out = w.handle(Event::Choose(1));
-        out.extend(w.handle(Event::Choose(1)));
-        out.extend(w.handle(Event::Choose(0)));
+        let choose = |index| Event::Choose { item: 5, index };
+        let mut out = w.handle(choose(1));
+        out.extend(w.handle(choose(1)));
+        out.extend(w.handle(choose(0)));
         assert_eq!(
             stores(&out),
             vec![
@@ -448,7 +467,7 @@ fn c_settings_window_7() {
     });
 }
 
-/// Item 8's tooltip reads "Show additional digits after decimal point",
+/// Item 10's tooltip reads "Show additional digits after decimal point",
 /// and the English translation file has no line with the misspelling
 /// "additionnal".
 #[test]
@@ -457,23 +476,30 @@ fn c_settings_window_8() {
         let fx = cfg::build("good");
         let plan = open(&fx).plan();
         assert_eq!(
-            tip(&plan, 8).as_deref(),
+            tip(&plan, 10).as_deref(),
             Some("Show additional digits after decimal point")
         );
         assert_eq!(grep_count("additionnal"), "0");
     });
 }
 
-/// Of items 9 to 18, only the lm-sensors, liquidctl and "lm-sensors
-/// (drives only)" switches (items 9, 10 and 12) have a tooltip, with the
-/// expected text.
+/// The two text size lists (items 3 and 4) have the panel and the dock
+/// tooltips. Of items 11 to 20, only the lm-sensors, liquidctl and
+/// "lm-sensors (drives only)" switches (items 11, 12 and 14) have a
+/// tooltip, with the expected text.
 #[test]
 fn c_settings_window_10() {
     puron_testkit::limit("C-settings.window-10", LIMIT, || {
         let fx = cfg::build("good");
         let plan = open(&fx).plan();
-        let got: Vec<_> = (9..=18).map(|n| tip(&plan, n)).collect();
+        let got: Vec<_> = [3, 4]
+            .into_iter()
+            .chain(11..=20)
+            .map(|n| tip(&plan, n))
+            .collect();
         let mut want = vec![
+            Some("Text size when Puron is on a panel".to_string()),
+            Some("Text size when Puron is on a dock".to_string()),
             Some("Read sensors from lm-sensors".to_string()),
             Some("Read sensors from liquidctl (requires v1.7.0 or later)".to_string()),
             None,
@@ -504,7 +530,10 @@ fn c_settings_window_11() {
         let fx = cfg::build("readonly");
         let mut w = open(&fx);
         assert_eq!(w.plan().notice, None, "no notice at open");
-        let first = w.handle(Event::Switch { item: 8, on: false });
+        let first = w.handle(Event::Switch {
+            item: 10,
+            on: false,
+        });
         assert_eq!(
             first,
             vec![Output::Store {
@@ -514,7 +543,7 @@ fn c_settings_window_11() {
             }],
             "first Store failed, nothing else"
         );
-        assert!(!switch_of(&w.plan(), 8), "switch shown off");
+        assert!(!switch_of(&w.plan(), 10), "switch shown off");
         assert_eq!(fx.entry("show_decimals"), b"true", "entry still true");
         assert_eq!(
             w.plan().notice.as_deref(),
@@ -524,9 +553,12 @@ fn c_settings_window_11() {
         // Make the settings directory and its parent writable again.
         make_writable(&fx.root.join("cosmic/io.github.elalonde.Puron"));
         make_writable(&fx.id_dir());
-        let mut out = w.handle(Event::Switch { item: 8, on: true });
+        let mut out = w.handle(Event::Switch { item: 10, on: true });
         assert_eq!(w.plan().notice, None, "notice gone after a stored value");
-        out.extend(w.handle(Event::Switch { item: 8, on: false }));
+        out.extend(w.handle(Event::Switch {
+            item: 10,
+            on: false,
+        }));
         assert_eq!(
             stores(&out),
             vec![
@@ -591,7 +623,7 @@ fn c_settings_window_12() {
         writer(&fx.root, "poll_interval_secs", "9");
         out.extend(deliver(&mut w, &rx));
         let plan = w.plan();
-        assert!(switch_of(&plan, 18), "Show Power shown on");
+        assert!(switch_of(&plan, 20), "Show Power shown on");
         assert_eq!(field(&plan).0, 9, "the field 9");
         assert_eq!(field(&plan).1, "9", "the field's text 9");
         assert_eq!(stores(&out), vec![], "Store list");
@@ -624,15 +656,16 @@ const CHILD14: &str = "PURON_SETTINGS14_CHILD";
 
 /// Under a test catalog that prefixes every English text with "EO ", the
 /// headings, labels, tooltips and list entries are translated, while the
-/// title and the five product names (items 9 to 11, 13 and 14) stay as
-/// they are. Item 12, "lm-sensors (drives only)", holds a word and is
-/// translated.
+/// title and the five product names (items 11 to 13, 15 and 16) stay as
+/// they are. Item 14, "lm-sensors (drives only)", holds a word and is
+/// translated. The text size lists show the translated match texts and
+/// each number joined to the translated unit.
 /// The check runs in a child process with `LANG=eo.UTF-8` and the other
 /// locale variables removed.
 #[test]
 fn c_settings_window_14() {
     /// The items whose label is a product name.
-    const PRODUCT_ITEMS: [usize; 5] = [9, 10, 11, 13, 14];
+    const PRODUCT_ITEMS: [usize; 5] = [11, 12, 13, 15, 16];
     puron_testkit::limit("C-settings.window-14", LIMIT, || {
         if std::env::var_os(CHILD14).is_none() {
             let mut cmd = puron_testkit::rerun_self("c_settings_window_14");
@@ -676,13 +709,23 @@ fn c_settings_window_14() {
                     assert!(eo(t), "tooltip {id} {t:?}");
                 }
                 if let Control::List { items, .. } = &i.control {
-                    assert_eq!(items, &["EO °C", "EO °F"], "list items");
+                    if i.key == "temperature_unit" {
+                        assert_eq!(items, &["EO °C", "EO °F"], "list items");
+                    }
                 }
             }
         }
         let labels: Vec<_> = PRODUCT_ITEMS.map(|n| item(&plan, n).label).to_vec();
         assert_eq!(labels, products, "product names unchanged");
-        assert_eq!(item(&plan, 12).label, "EO lm-sensors (drives only)");
+        assert_eq!(item(&plan, 14).label, "EO lm-sensors (drives only)");
+        let sizes = ["10", "12", "14", "16", "18", "20", "24"].map(|n| format!("{n}EO  px"));
+        for (n, first) in [(3, "EO Match panel size"), (4, "EO Match dock size")] {
+            let Control::List { items, .. } = item(&plan, n).control else {
+                panic!("item {n} is not a list");
+            };
+            assert_eq!(items[0], first, "item {n} first entry");
+            assert_eq!(items[1..], sizes, "item {n} fixed sizes");
+        }
     });
 }
 
@@ -709,7 +752,7 @@ const NO_ROOT: &str = "PURON_SWIN_NO_ROOT";
 /// No configuration root: the test runs again in a second process without
 /// `HOME`, `XDG_CONFIG_HOME`, `FLATPAK_ID` and `HOST_XDG_CONFIG_HOME`, in
 /// an empty current directory. A window on `Config::user` opens, then the
-/// switch of item 8 is flipped. Expects the defaults shown, one store
+/// switch of item 10 is flipped. Expects the defaults shown, one store
 /// of that switch that returns `Failed`, and the current directory still
 /// empty: nothing is written relative to it.
 #[test]
@@ -720,7 +763,7 @@ fn c_settings_window_28() {
             let mut w = Window::new(Config::user());
             assert_eq!(w.handle(Event::Open), vec![Output::WatchStart], "Open");
             assert_eq!(shown(&w.plan()), DEFAULTS);
-            let out = toggle(&mut w, 8);
+            let out = toggle(&mut w, 10);
             assert_eq!(results(&out), [StoreResult::Failed]);
             return;
         }
@@ -744,5 +787,117 @@ fn c_settings_window_28() {
             left.is_empty(),
             "written in the current directory: {left:?}"
         );
+    });
+}
+
+/// The entry texts of list item `n` and the text of its selected entry.
+fn list_of(plan: &Plan, n: usize) -> (Vec<String>, String) {
+    match item(plan, n).control {
+        Control::List { items, shown } => {
+            let text = items[shown].clone();
+            (items, text)
+        }
+        c => panic!("item {n} is not a list: {c:?}"),
+    }
+}
+
+/// Chooses the entry with the text `text` in list item `n`, as a click on
+/// that entry would.
+fn choose(w: &mut Window, n: usize, text: &str) -> Vec<Output> {
+    let (items, _) = list_of(&w.plan(), n);
+    let index = items
+        .iter()
+        .position(|t| t == text)
+        .unwrap_or_else(|| panic!("item {n} has no entry {text:?}: {items:?}"));
+    w.handle(Event::Choose { item: n, index })
+}
+
+/// With nothing stored, the panel text size list (item 3) offers "Match
+/// panel size" and 10 to 24 px, the dock list (item 4) the same with
+/// "Match dock size" first, and each shows its match entry. Choosing each
+/// entry of item 3 in turn, starting with the last, stores each matching
+/// size under `panel_text_size` only, and choosing the shown entry again
+/// stores nothing; the same in item 4 stores under `dock_text_size`.
+/// After each choice the chosen list shows the choice and the other list
+/// keeps its entry, and a new load reads both lists' last choice. A
+/// window opened on entries that are not usable shows both match entries,
+/// stores nothing on close and leaves both entries as they were.
+#[test]
+fn c_settings_window_30() {
+    puron_testkit::limit("C-settings.window-30", LIMIT, || {
+        let fixed = [
+            "10 px", "12 px", "14 px", "16 px", "18 px", "20 px", "24 px",
+        ];
+        let fx = cfg::build("empty-none");
+        let mut w = open(&fx);
+        let plan = w.plan();
+        let mut panel_items = vec!["Match panel size".to_string()];
+        panel_items.extend(fixed.map(String::from));
+        let mut dock_items = vec!["Match dock size".to_string()];
+        dock_items.extend(fixed.map(String::from));
+        assert_eq!(list_of(&plan, 3), (panel_items, "Match panel size".into()));
+        assert_eq!(list_of(&plan, 4), (dock_items, "Match dock size".into()));
+
+        let order = [
+            TextSize::Px24,
+            TextSize::MatchPanel,
+            TextSize::Px10,
+            TextSize::Px12,
+            TextSize::Px14,
+            TextSize::Px16,
+            TextSize::Px18,
+            TextSize::Px20,
+        ];
+        let panel_texts = [
+            "24 px",
+            "Match panel size",
+            "10 px",
+            "12 px",
+            "14 px",
+            "16 px",
+            "18 px",
+            "20 px",
+        ];
+        let mut dock_texts = panel_texts;
+        dock_texts[1] = "Match dock size";
+        let mut out = Vec::new();
+        for text in panel_texts.into_iter().chain(["20 px"]) {
+            out.extend(choose(&mut w, 3, text));
+            let plan = w.plan();
+            assert_eq!(list_of(&plan, 3).1, text, "item 3 after {text}");
+            assert_eq!(
+                list_of(&plan, 4).1,
+                "Match dock size",
+                "item 4 after {text}"
+            );
+        }
+        for text in dock_texts {
+            out.extend(choose(&mut w, 4, text));
+            let plan = w.plan();
+            assert_eq!(list_of(&plan, 4).1, text, "item 4 after {text}");
+            assert_eq!(list_of(&plan, 3).1, "20 px", "item 3 after {text}");
+        }
+        let want: Vec<(&str, Value)> = order
+            .map(|t| ("panel_text_size", Value::TextSize(t)))
+            .into_iter()
+            .chain(order.map(|t| ("dock_text_size", Value::TextSize(t))))
+            .collect();
+        assert_eq!(stores(&out), want, "Store list");
+        assert_eq!(results(&out), vec![StoreResult::Stored; 16], "each stored");
+        let loaded = Config::new(&fx.root).load();
+        assert_eq!(loaded.settings.panel_text_size, TextSize::Px20, "Load");
+        assert_eq!(loaded.settings.dock_text_size, TextSize::Px20, "Load");
+
+        let bad = cfg::build("empty-none");
+        cfg::write(&bad.id_dir().join("panel_text_size"), b"Default");
+        cfg::write(&bad.id_dir().join("dock_text_size"), b"24");
+        let before = bad.tree();
+        let mut w = open(&bad);
+        let plan = w.plan();
+        assert_eq!(list_of(&plan, 3).1, "Match panel size", "unusable panel");
+        assert_eq!(list_of(&plan, 4).1, "Match dock size", "unusable dock");
+        let out = w.handle(Event::Close);
+        assert_eq!(stores(&out), vec![], "Store list on close");
+        assert_eq!(bad.tree(), before, "entries unchanged");
     });
 }

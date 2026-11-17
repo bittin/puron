@@ -22,6 +22,52 @@ pub enum TemperatureUnit {
     Fahrenheit,
 }
 
+/// The size of the value texts on the panel button, one setting for a
+/// panel and one for a dock. It is stored as the variant name, so
+/// `MatchPanel` and `Px10` to `Px24` are the only stored values that read
+/// back. `MatchPanel` makes the text follow the size of the panel or dock
+/// the applet is on; the applet's panel module turns it into pixels.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub enum TextSize {
+    MatchPanel,
+    Px10,
+    Px12,
+    Px14,
+    Px16,
+    Px18,
+    Px20,
+    Px24,
+}
+
+impl TextSize {
+    /// Every value, in the order the settings window lists them.
+    pub const ALL: [TextSize; 8] = [
+        TextSize::MatchPanel,
+        TextSize::Px10,
+        TextSize::Px12,
+        TextSize::Px14,
+        TextSize::Px16,
+        TextSize::Px18,
+        TextSize::Px20,
+        TextSize::Px24,
+    ];
+
+    /// The size in px of a fixed value; `None` for `MatchPanel`, whose
+    /// size depends on the panel.
+    pub fn fixed_px(self) -> Option<u16> {
+        match self {
+            TextSize::MatchPanel => None,
+            TextSize::Px10 => Some(10),
+            TextSize::Px12 => Some(12),
+            TextSize::Px14 => Some(14),
+            TextSize::Px16 => Some(16),
+            TextSize::Px18 => Some(18),
+            TextSize::Px20 => Some(20),
+            TextSize::Px24 => Some(24),
+        }
+    }
+}
+
 /// The settings in effect: one value per setting, after defaults and the
 /// interval range have been applied to the stored values (see
 /// [`settings`]).
@@ -29,6 +75,11 @@ pub enum TemperatureUnit {
 pub struct Settings {
     pub poll_interval_secs: u32,
     pub show_panel_icons: bool,
+    /// The text size of the panel button when the applet is on a panel,
+    /// or on a panel of a type that is neither a panel nor a dock.
+    pub panel_text_size: TextSize,
+    /// The text size of the panel button when the applet is on a dock.
+    pub dock_text_size: TextSize,
     pub temperature_unit: TemperatureUnit,
     pub show_temperature_unit: bool,
     pub show_rotation_rate_unit: bool,
@@ -68,6 +119,8 @@ pub struct Settings {
 pub struct Stored {
     pub poll_interval_secs: Option<u32>,
     pub show_panel_icons: Option<bool>,
+    pub panel_text_size: Option<TextSize>,
+    pub dock_text_size: Option<TextSize>,
     pub temperature_unit: Option<TemperatureUnit>,
     pub show_temperature_unit: Option<bool>,
     pub show_rotation_rate_unit: Option<bool>,
@@ -99,6 +152,8 @@ pub fn settings(stored: &Stored) -> Settings {
             v.clamp(POLL_INTERVAL_MIN, POLL_INTERVAL_MAX)
         }),
         show_panel_icons: s.show_panel_icons.unwrap_or(true),
+        panel_text_size: s.panel_text_size.unwrap_or(TextSize::MatchPanel),
+        dock_text_size: s.dock_text_size.unwrap_or(TextSize::MatchPanel),
         temperature_unit: s.temperature_unit.unwrap_or(TemperatureUnit::Celsius),
         show_temperature_unit: s.show_temperature_unit.unwrap_or(true),
         show_rotation_rate_unit: s.show_rotation_rate_unit.unwrap_or(true),

@@ -2,6 +2,8 @@
 # value in RON. Lines: <key> <RON value>.
 poll_interval_secs 7
 show_panel_icons false
+panel_text_size Px20
+dock_text_size Px12
 temperature_unit Fahrenheit
 show_temperature_unit false
 show_rotation_rate_unit false

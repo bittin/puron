@@ -6,11 +6,13 @@
 //! `view` turns a plan into widgets. Because no display is needed, the
 //! tests drive `Window` directly.
 //!
-//! The window has 18 items, numbered from 1 in the order they are shown.
+//! The window has 20 items, numbered from 1 in the order they are shown.
 //! Events and the tables below address items by that number.
 
 use puron_config::{Config, Delivery, StoreResult, Value};
-use puron_core::settings::{Settings, TemperatureUnit, POLL_INTERVAL_MAX, POLL_INTERVAL_MIN};
+use puron_core::settings::{
+    Settings, TemperatureUnit, TextSize, POLL_INTERVAL_MAX, POLL_INTERVAL_MIN,
+};
 
 /// The window title. It is not translated.
 pub const TITLE: &str = "Puron";
@@ -49,9 +51,11 @@ pub enum Event {
     Open,
     /// The user set the switch of item `item` to `on`.
     Switch { item: usize, on: bool },
-    /// The user chose entry `index` of the temperature unit list (item
-    /// 3); see `UNITS` for the order.
-    Choose(usize),
+    /// The user chose entry `index` of the list of item `item`: the
+    /// panel text size (item 3) or the dock text size (item 4), in the
+    /// order of `TextSize::ALL`, or the temperature unit (item 5), in the
+    /// order of `UNITS`.
+    Choose { item: usize, index: usize },
     /// The number field's + button.
     Plus,
     /// The number field's − button.
@@ -99,8 +103,8 @@ pub enum Control {
         plus: bool,
     },
     Switch(bool),
-    /// The drop-down list (item 3, the temperature unit): its entry texts
-    /// and the index of the selected one.
+    /// A drop-down list (the two text sizes and the temperature unit):
+    /// its entry texts and the index of the selected one.
     List {
         items: Vec<String>,
         shown: usize,
@@ -140,9 +144,11 @@ pub struct Plan {
 /// The settings key of each item: entry `n - 1` belongs to item `n`.
 /// `debug_logging` and `pinned` have no item; the window does not edit
 /// them.
-const KEYS: [&str; 18] = [
+const KEYS: [&str; 20] = [
     puron_config::POLL_INTERVAL_SECS,
     puron_config::SHOW_PANEL_ICONS,
+    puron_config::PANEL_TEXT_SIZE,
+    puron_config::DOCK_TEXT_SIZE,
     puron_config::TEMPERATURE_UNIT,
     puron_config::SHOW_TEMPERATURE_UNIT,
     puron_config::SHOW_ROTATION_RATE_UNIT,
@@ -163,7 +169,7 @@ const KEYS: [&str; 18] = [
 
 /// The five sections, as the first and last item number of each. `heading`
 /// gives their headings in the same order.
-const SECTIONS: [(usize, usize); 5] = [(1, 8), (9, 10), (11, 11), (12, 14), (15, 18)];
+const SECTIONS: [(usize, usize); 5] = [(1, 10), (11, 12), (13, 13), (14, 16), (17, 20)];
 
 /// The translated heading of section `section`, counted from 0.
 fn heading(section: usize) -> String {
@@ -176,41 +182,71 @@ fn heading(section: usize) -> String {
     }
 }
 
-/// The label of item `item`. Items 9 to 14 switch a sensor source on or
-/// off. All of them but item 12 are labelled with the source's product
-/// name, which is not translated. Item 12 switches a part of a source,
+/// The label of item `item`. Items 11 to 16 switch a sensor source on or
+/// off. All of them but item 14 are labelled with the source's product
+/// name, which is not translated. Item 14 switches a part of a source,
 /// the drives that lm-sensors reads, so its label holds a translated
 /// word. The other labels are translated.
 fn label(item: usize) -> String {
     match item {
         1 => fl!("label-poll"),
         2 => fl!("label-panel-icons"),
-        3 => fl!("label-temp-unit"),
-        4 => fl!("label-temp-suffix"),
-        5 => fl!("label-fan-suffix"),
-        6 => fl!("label-volt-suffix"),
-        7 => fl!("label-watt-suffix"),
-        8 => fl!("label-decimals"),
-        9 => "lm-sensors".to_string(),
-        10 => "liquidctl".to_string(),
-        11 => "Nvidia".to_string(),
-        12 => fl!("label-lm-sensors-drives"),
-        13 => "Udisks2".to_string(),
-        14 => "nvme-cli".to_string(),
-        15 => fl!("class-temperature"),
-        16 => fl!("class-rotation"),
-        17 => fl!("class-voltage"),
+        3 => fl!("label-panel-text-size"),
+        4 => fl!("label-dock-text-size"),
+        5 => fl!("label-temp-unit"),
+        6 => fl!("label-temp-suffix"),
+        7 => fl!("label-fan-suffix"),
+        8 => fl!("label-volt-suffix"),
+        9 => fl!("label-watt-suffix"),
+        10 => fl!("label-decimals"),
+        11 => "lm-sensors".to_string(),
+        12 => "liquidctl".to_string(),
+        13 => "Nvidia".to_string(),
+        14 => fl!("label-lm-sensors-drives"),
+        15 => "Udisks2".to_string(),
+        16 => "nvme-cli".to_string(),
+        17 => fl!("class-temperature"),
+        18 => fl!("class-rotation"),
+        19 => fl!("class-voltage"),
         _ => fl!("class-power"),
     }
 }
 
-/// The tooltip of item `item`; only items 8, 9, 10 and 12 have one.
+/// The tooltip of item `item`; only items 3, 4, 10, 11, 12 and 14 have
+/// one.
 fn tooltip(item: usize) -> Option<(&'static str, String)> {
     match item {
-        8 => Some(("tip-decimals", fl!("tip-decimals"))),
-        9 => Some(("tip-lm-sensors", fl!("tip-lm-sensors"))),
-        10 => Some(("tip-liquidctl", fl!("tip-liquidctl"))),
-        12 => Some(("tip-lm-sensors-drives", fl!("tip-lm-sensors-drives"))),
+        3 => Some(("tip-panel-text-size", fl!("tip-panel-text-size"))),
+        4 => Some(("tip-dock-text-size", fl!("tip-dock-text-size"))),
+        10 => Some(("tip-decimals", fl!("tip-decimals"))),
+        11 => Some(("tip-lm-sensors", fl!("tip-lm-sensors"))),
+        12 => Some(("tip-liquidctl", fl!("tip-liquidctl"))),
+        14 => Some(("tip-lm-sensors-drives", fl!("tip-lm-sensors-drives"))),
+        _ => None,
+    }
+}
+
+/// The entry texts of a text size list, in the order of `TextSize::ALL`.
+/// The match value has its own text in each list, `match_text`; a fixed
+/// size is its number joined to the translated unit, so the number itself
+/// is never looked up in the catalog.
+fn text_size_items(match_text: String) -> Vec<String> {
+    let px = fl!("suffix-px");
+    TextSize::ALL
+        .iter()
+        .map(|t| match t.fixed_px() {
+            Some(n) => format!("{n}{px}"),
+            None => match_text.clone(),
+        })
+        .collect()
+}
+
+/// The setting in `s` that the text size list of item `item` changes.
+/// `None` for any item but 3 and 4.
+fn text_size(s: &mut Settings, item: usize) -> Option<&mut TextSize> {
+    match item {
+        3 => Some(&mut s.panel_text_size),
+        4 => Some(&mut s.dock_text_size),
         _ => None,
     }
 }
@@ -225,25 +261,25 @@ fn unit_items() -> Vec<String> {
 }
 
 /// The setting in `s` that the switch of item `item` changes. `None` for
-/// an item without a switch (1 and 3) or a number outside 1 to 18.
+/// an item without a switch (1, 3, 4 and 5) or a number outside 1 to 20.
 fn switch(s: &mut Settings, item: usize) -> Option<&mut bool> {
     Some(match item {
         2 => &mut s.show_panel_icons,
-        4 => &mut s.show_temperature_unit,
-        5 => &mut s.show_rotation_rate_unit,
-        6 => &mut s.show_voltage_unit,
-        7 => &mut s.show_power_unit,
-        8 => &mut s.show_decimals,
-        9 => &mut s.provider_lm_sensors,
-        10 => &mut s.provider_liquidctl,
-        11 => &mut s.provider_nvidia,
-        12 => &mut s.provider_lm_sensors_drives,
-        13 => &mut s.provider_udisks2,
-        14 => &mut s.provider_nvme,
-        15 => &mut s.show_temperature,
-        16 => &mut s.show_rotation_rate,
-        17 => &mut s.show_voltage,
-        18 => &mut s.show_power,
+        6 => &mut s.show_temperature_unit,
+        7 => &mut s.show_rotation_rate_unit,
+        8 => &mut s.show_voltage_unit,
+        9 => &mut s.show_power_unit,
+        10 => &mut s.show_decimals,
+        11 => &mut s.provider_lm_sensors,
+        12 => &mut s.provider_liquidctl,
+        13 => &mut s.provider_nvidia,
+        14 => &mut s.provider_lm_sensors_drives,
+        15 => &mut s.provider_udisks2,
+        16 => &mut s.provider_nvme,
+        17 => &mut s.show_temperature,
+        18 => &mut s.show_rotation_rate,
+        19 => &mut s.show_voltage,
+        20 => &mut s.show_power,
         _ => return None,
     })
 }
@@ -370,7 +406,7 @@ impl Window {
                 *slot = on;
                 vec![self.store(KEYS[item - 1], Value::Bool(on))]
             }
-            Event::Choose(index) => {
+            Event::Choose { item: 5, index } => {
                 let Some(&unit) = UNITS.get(index) else {
                     return Vec::new();
                 };
@@ -378,7 +414,20 @@ impl Window {
                     return Vec::new();
                 }
                 self.shown.temperature_unit = unit;
-                vec![self.store(KEYS[2], Value::TemperatureUnit(unit))]
+                vec![self.store(KEYS[4], Value::TemperatureUnit(unit))]
+            }
+            Event::Choose { item, index } => {
+                let Some(&size) = TextSize::ALL.get(index) else {
+                    return Vec::new();
+                };
+                let Some(slot) = text_size(&mut self.shown, item) else {
+                    return Vec::new();
+                };
+                if *slot == size {
+                    return Vec::new();
+                }
+                *slot = size;
+                vec![self.store(KEYS[item - 1], Value::TextSize(size))]
             }
             // Whether a button acts depends on the shown value, not on any
             // typed text. A press first commits the typed text, then steps
@@ -449,7 +498,18 @@ impl Window {
                                     plus: value < POLL_INTERVAL_MAX,
                                 }
                             }
-                            3 => Control::List {
+                            3 | 4 => Control::List {
+                                items: text_size_items(if item == 3 {
+                                    fl!("text-size-match")
+                                } else {
+                                    fl!("text-size-match-dock")
+                                }),
+                                shown: {
+                                    let size = *text_size(&mut shown, item).expect("a text size");
+                                    TextSize::ALL.iter().position(|&t| t == size).unwrap_or(0)
+                                },
+                            },
+                            5 => Control::List {
                                 items: unit_items(),
                                 shown: UNITS
                                     .iter()

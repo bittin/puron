@@ -2,7 +2,7 @@
 //! must finish within 2 seconds (`puron_testkit::limit`). Stored values
 //! are given inline.
 
-use puron_core::settings::{self, Settings, Stored, TemperatureUnit};
+use puron_core::settings::{self, Settings, Stored, TemperatureUnit, TextSize};
 
 const LIMIT: u64 = 2;
 
@@ -12,6 +12,8 @@ fn defaults() -> Settings {
     Settings {
         poll_interval_secs: 5,
         show_panel_icons: true,
+        panel_text_size: TextSize::MatchPanel,
+        dock_text_size: TextSize::MatchPanel,
         temperature_unit: TemperatureUnit::Celsius,
         show_temperature_unit: true,
         show_rotation_rate_unit: true,
@@ -87,6 +89,8 @@ fn c_core_settings_5() {
         let stored = Stored {
             poll_interval_secs: Some(7),
             show_panel_icons: Some(false),
+            panel_text_size: Some(TextSize::Px20),
+            dock_text_size: Some(TextSize::Px12),
             temperature_unit: Some(TemperatureUnit::Fahrenheit),
             show_temperature_unit: Some(false),
             show_rotation_rate_unit: Some(false),
@@ -110,6 +114,8 @@ fn c_core_settings_5() {
         let want = Settings {
             poll_interval_secs: 7,
             show_panel_icons: false,
+            panel_text_size: TextSize::Px20,
+            dock_text_size: TextSize::Px12,
             temperature_unit: TemperatureUnit::Fahrenheit,
             show_temperature_unit: false,
             show_rotation_rate_unit: false,

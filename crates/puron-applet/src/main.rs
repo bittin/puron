@@ -19,24 +19,13 @@ use cosmic::iced::futures::stream::{self, BoxStream, StreamExt};
 use cosmic::iced::platform_specific::shell::commands::popup::{destroy_popup, get_popup};
 use cosmic::iced::window::Id;
 use cosmic::iced::Subscription;
-use cosmic::widget::button;
 use cosmic::Element;
 use puron_applet::app::{self, App, Event, Output, Programs, Source};
+use puron_applet::view::View;
 use puron_applet::{panel, popup};
 use puron_config::Config;
-use puron_core::menu::Menu;
-use puron_core::panel::Panel;
 use puron_engine::clock::SystemClock;
 use puron_engine::engine::Engine;
-
-/// A copy of the parts of `App` that the UI draws, sent by the event
-/// loop after every event. `menu` is `None` until the first layout.
-#[derive(Clone, Debug)]
-struct View {
-    menu: Option<Menu>,
-    panel: Panel,
-    pinned: Vec<String>,
-}
 
 /// The libcosmic application's messages: a new view from the event loop,
 /// a press on the panel button, a click in the popup, and the popup
@@ -74,9 +63,7 @@ struct Applet {
 
 impl Applet {
     fn popup_plan(&self) -> Option<popup::Plan> {
-        let menu = self.view.menu.as_ref()?;
-        let size = panel::icon_size(&self.core.applet);
-        Some(popup::plan(menu, &self.view.pinned, size))
+        self.view.popup_plan(&panel::Place::of(&self.core.applet))
     }
 
     fn send(&self, e: popup::Event) {
@@ -117,15 +104,7 @@ impl cosmic::Application for Applet {
         let applet = Applet {
             core,
             tx,
-            view: View {
-                menu: None,
-                panel: Panel {
-                    items: Vec::new(),
-                    padding: 0,
-                    state: Default::default(),
-                },
-                pinned: Vec::new(),
-            },
+            view: View::new(),
             popup_id: None,
         };
         (applet, Task::none())
@@ -184,21 +163,9 @@ impl cosmic::Application for Applet {
 
     fn view(&self) -> Element<'_, Msg> {
         let ctx = &self.core.applet;
-        let plan = panel::plan(
-            &self.view.panel,
-            panel::Orientation::of(ctx),
-            panel::icon_size(ctx),
-        );
-        let (major, minor) = ctx.suggested_padding(true);
-        let (h, v) = if ctx.is_horizontal() {
-            (major, minor)
-        } else {
-            (minor, major)
-        };
-        let b = button::custom(panel::view::<Msg>(&plan))
-            .padding([f32::from(v), f32::from(h)])
-            .class(cosmic::theme::Button::AppletIcon)
-            .on_press(Msg::Toggle);
+        let place = panel::Place::of(ctx);
+        let plan = self.view.panel_plan(&place);
+        let b = panel::button(&plan, &place, Msg::Toggle);
         ctx.autosize_window(b).into()
     }
 
@@ -206,11 +173,7 @@ impl cosmic::Application for Applet {
         match (self.popup_id == Some(id), self.popup_plan()) {
             (true, Some(plan)) => {
                 let content = popup::view(&plan).map(Msg::Clicked);
-                let width = self
-                    .view
-                    .menu
-                    .as_ref()
-                    .map_or(popup::WIDTH, |m| popup::width(m, plan.icon_size));
+                let width = self.view.popup_width(&panel::Place::of(&self.core.applet));
                 self.core
                     .applet
                     .popup_container(content)
@@ -239,11 +202,7 @@ fn main() {
     let loop_tx = tx.clone();
     let event_loop = std::thread::spawn(move || {
         app::run(state, loop_tx, rx, move |_, a: &App, _: &[Output]| {
-            let _ = vtx.unbounded_send(View {
-                menu: a.menu().cloned(),
-                panel: a.panel().clone(),
-                pinned: a.pinned().to_vec(),
-            });
+            let _ = vtx.unbounded_send(View::of(a));
         })
     });
 

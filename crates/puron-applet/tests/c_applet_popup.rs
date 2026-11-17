@@ -528,7 +528,15 @@ fn c_applet_panel_14() {
         };
         let items =
             puron_core::panel::panel(&menu::shown(&capture(), &s), &pins, &s, &State::default());
-        let plan = panel::plan(&items, panel::Orientation::Horizontal, icon_size());
+        let place = panel::Place {
+            orientation: panel::Orientation::Horizontal,
+            ..panel::Place::of(&Context {
+                size: AppletSize::PanelSize(PanelSize::M),
+                panel_type: applet::PanelType::Panel,
+                ..Context::default()
+            })
+        };
+        let plan = panel::plan(&items, &place, &s);
         // The panel shows the pins in the popup's order, whatever their
         // order in the pinned list, each with its line's icon.
         let on_panel: Vec<(usize, &str)> = plan
@@ -946,5 +954,66 @@ fn c_applet_popup_24() {
             .iter()
             .any(|e| matches!(e, Drawn::Line(l) if l.identity == wifi.identity)));
         assert_eq!(popup::clicked(&gone, got[0].clone()), none);
+    });
+}
+
+/// The popup that the applet draws from its state at panel size M, with
+/// the pinned list `P1`, is the same whatever the text size settings hold:
+/// with both at 14 px, both at 24 px and both at the match value, each on
+/// a panel and on a dock, the six plans are equal, and every entry's
+/// rectangle and the popup's width equal those of the first (within
+/// 0.5 px).
+#[test]
+fn c_applet_popup_25() {
+    use puron_applet::panel::{Orientation, Place};
+    use puron_applet::view::View;
+    use puron_core::settings::TextSize;
+    puron_testkit::limit("C-applet.popup-25", LIMIT, || {
+        setup();
+        let menu = lay(&capture(), None);
+        let mut first: Option<(Plan, f32, Vec<Rectangle>)> = None;
+        for size in [TextSize::Px14, TextSize::Px24, TextSize::MatchPanel] {
+            for panel_type in [applet::PanelType::Panel, applet::PanelType::Dock] {
+                let case = format!("{size:?} on {panel_type:?}");
+                let view = View {
+                    menu: Some(menu.clone()),
+                    pinned: pinned("P1"),
+                    settings: Settings {
+                        panel_text_size: size,
+                        dock_text_size: size,
+                        ..Settings::default()
+                    },
+                    ..View::new()
+                };
+                let place = Place {
+                    orientation: Orientation::Horizontal,
+                    ..Place::of(&Context {
+                        size: AppletSize::PanelSize(PanelSize::M),
+                        panel_type,
+                        ..Context::default()
+                    })
+                };
+                let plan = view.popup_plan(&place).expect("a layout");
+                let width = view.popup_width(&place);
+                let mut sim = simulate_at(&plan, width);
+                let rects: Vec<Rectangle> = (0..plan.entries.len())
+                    .map(|i| bounds(&mut sim, popup::entry_id(i)))
+                    .collect();
+                let Some((plan0, width0, rects0)) = &first else {
+                    first = Some((plan, width, rects));
+                    continue;
+                };
+                assert_eq!(&plan, plan0, "plan, {case}");
+                assert!(near(width, *width0, 0.5), "width {width}, {case}");
+                assert_eq!(rects.len(), rects0.len(), "entries, {case}");
+                for (i, (r, r0)) in rects.iter().zip(rects0).enumerate() {
+                    let same = near(r.x, r0.x, 0.5)
+                        && near(r.y, r0.y, 0.5)
+                        && near(r.width, r0.width, 0.5)
+                        && near(r.height, r0.height, 0.5);
+                    assert!(same, "entry {i} {r:?} against {r0:?}, {case}");
+                }
+            }
+        }
     });
 }
