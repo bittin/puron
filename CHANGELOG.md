@@ -4,6 +4,21 @@ The notable changes of each Puron release. Versions follow
 [Semantic Versioning](https://semver.org/), and the format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [1.5.0] - 2026-11-17
+
+### Changed
+
+- The panel button keeps its width when a value gets shorter, so that the other sensors on the button and the applets
+  beside Puron do not move when, for example, a fan drops from 1234 to 0 rpm.
+- Each value on the panel button sits in a box as wide as the widest normal value of its kind, such as 888°C for a
+  temperature or 8888 rpm for a fan, and the value is aligned to the right of its box. Most buttons are therefore wider
+  than before.
+- A box grows when a value needs more digits, such as a fan at 12000 rpm, and keeps that width. It becomes narrow again
+  only when Puron starts, when a setting that changes the value texts or their size changes (the temperature unit, the
+  decimals, showing or hiding a unit, or the panel or dock text size), or when the sensor leaves the panel button.
+- The same holds on a vertical panel or dock: each box has the same width as on a horizontal panel and is centered in
+  the column.
+
 ## [1.4.0] - 2026-11-17
 
 ### Added

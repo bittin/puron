@@ -1,3 +1,9 @@
+puron (1.5.0) unstable; urgency=medium
+
+  * Release 1.5.0. The changes are in CHANGELOG.md of the source.
+
+ -- elalonde <eric@lalonde.com>  Tue, 17 Nov 2026 12:00:00 +0000
+
 puron (1.4.0) unstable; urgency=medium
 
   * Release 1.4.0. The changes are in CHANGELOG.md of the source.
