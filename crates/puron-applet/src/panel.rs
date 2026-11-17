@@ -3,10 +3,18 @@
 //! module chooses no item, value or icon kind itself and holds no state.
 //! It also owns the map from icon kinds to icon names, which the popup
 //! uses too.
+//!
+//! Each value text sits in a *box*: room as wide as the widest of the
+//! value and the item's box texts (see `puron_core::panel`), with the
+//! value at its right edge. A value that gets shorter then leaves the
+//! box, and every element after it, where they were.
 
 use cosmic::applet::{Context, PanelType};
-use cosmic::iced::alignment::Vertical;
-use cosmic::iced::{Alignment, Length, Padding};
+use cosmic::iced::advanced::layout::{Layout, Limits, Node};
+use cosmic::iced::advanced::widget::{Tree, Widget};
+use cosmic::iced::advanced::{mouse, renderer};
+use cosmic::iced::alignment::{Horizontal, Vertical};
+use cosmic::iced::{Alignment, Length, Padding, Rectangle, Size};
 use cosmic::widget::{button, column, container, icon, row, text, Id, Space};
 use puron_core::menu::{IconKind, Section};
 use puron_core::panel::{Icon, Item, Panel};
@@ -50,11 +58,11 @@ pub fn icon_size(context: &Context) -> u16 {
     context.suggested_size(true).0
 }
 
-/// The smallest text size in px that the match value gives, so that the
-/// text stays readable on a very small custom panel.
+/// The smallest text size in px that `TextSize::MatchPanel` gives, so that
+/// the text stays readable on a very small custom panel.
 pub const MATCH_TEXT_SIZE_MIN: u16 = 8;
 
-/// The text size in px that the match value gives beside icons of
+/// The text size in px that `TextSize::MatchPanel` gives beside icons of
 /// `icon_size` px: seven eighths of the icon size, rounded down, and at
 /// least `MATCH_TEXT_SIZE_MIN`. At COSMIC's default panel size the icons
 /// are 16 px, which gives 14 px, the size the text always had before it
@@ -164,6 +172,13 @@ pub enum Element {
 #[derive(Clone, Debug, PartialEq)]
 pub struct Plan {
     pub orientation: Orientation,
+    /// The box texts of each item, at the item's index in `Panel::items`:
+    /// the texts whose width the box of the item's value text takes,
+    /// although only the value is drawn. For a pin they are its box text
+    /// with its unit (when it has one), then the texts for no value and
+    /// for a missing value, so that each of the two fits in the box when
+    /// it replaces the value. The empty-state item has none.
+    pub boxes: Vec<Vec<String>>,
     pub elements: Vec<Element>,
     pub spacing: f32,
     /// The padding in px before and after each icon or slot along the
@@ -207,8 +222,27 @@ pub fn plan(panel: &Panel, place: &Place, settings: &Settings) -> Plan {
             }
         }
     }
+    let boxes = panel
+        .items
+        .iter()
+        .enumerate()
+        .map(|(item, it)| match it {
+            Item::EmptyState => Vec::new(),
+            Item::Pin { .. } => {
+                let template = panel.boxes.get(item).and_then(Option::as_ref);
+                let mut texts: Vec<String> = template
+                    .map(|t| i18n::value_text(Some(t)))
+                    .into_iter()
+                    .collect();
+                texts.push(i18n::value_text(None));
+                texts.push(i18n::panel_value(None));
+                texts
+            }
+        })
+        .collect();
     Plan {
         orientation,
+        boxes,
         elements,
         spacing: SPACING,
         icon_padding: match orientation {
@@ -222,15 +256,23 @@ pub fn plan(panel: &Panel, place: &Place, settings: &Settings) -> Plan {
 }
 
 /// The widget ID of the element at `index` in `Plan::elements`, so that
-/// tests can find its rectangle.
+/// tests can find its rectangle. For a text element that rectangle is its
+/// box.
 pub fn element_id(index: usize) -> Id {
     Id::new(format!("e{index}"))
+}
+
+/// The widget ID of the value text inside the box of the text element at
+/// `index` in `Plan::elements`, so that tests can find the value's own
+/// rectangle.
+pub fn value_id(index: usize) -> Id {
+    Id::new(format!("v{index}"))
 }
 
 /// The panel button's content, built from the plan alone: a row on a
 /// horizontal panel, a column on a vertical one, centred across the
 /// panel. Each element sits in a container whose widget ID is
-/// `element_id(index)`. That container is exactly the text's or the
+/// `element_id(index)`. That container is exactly the text's box or the
 /// square's own rectangle; the padding is applied by an outer container,
 /// so it is not part of the rectangle.
 pub fn view<'a, M: 'a>(plan: &Plan) -> cosmic::Element<'a, M> {
@@ -264,15 +306,34 @@ pub fn view<'a, M: 'a>(plan: &Plan) -> cosmic::Element<'a, M> {
             )
             .padding(around)
             .into(),
-            // The text carries its own vertical centring. A text taller
-            // than its room is drawn from the text widget's alignment, not
-            // its row's, so without it a large text would start at the
-            // top of the button and be cut only at the bottom.
-            Element::Text { text: t, .. } => container(
+            // The box is a column, aligned to the right, of the box texts'
+            // room and the value: as wide as the widest of them and as
+            // high as the value. The text carries its own vertical
+            // centring. A text taller than its room is drawn from the text
+            // widget's alignment, not its row's, so without it a large
+            // text would start at the top of the button and be cut only at
+            // the bottom.
+            Element::Text { item, text: t } => container(
                 container(
-                    text(t.clone())
-                        .size(plan.text_size)
-                        .align_y(Vertical::Center),
+                    column::with_children(vec![
+                        Widest::new(
+                            plan.boxes
+                                .get(*item)
+                                .into_iter()
+                                .flatten()
+                                .map(|b| text(b.clone()).size(plan.text_size).into())
+                                .collect(),
+                        )
+                        .into(),
+                        container(
+                            text(t.clone())
+                                .size(plan.text_size)
+                                .align_y(Vertical::Center),
+                        )
+                        .id(value_id(i))
+                        .into(),
+                    ])
+                    .align_x(Horizontal::Right),
                 )
                 .id(element_id(i)),
             )
@@ -342,5 +403,69 @@ fn icon_padding(plan: &Plan) -> Padding {
             bottom: p,
             left: 0.0,
         },
+    }
+}
+
+/// Room as wide as the widest of some texts, with no height, that draws
+/// nothing. The texts are laid out in the size and font they are given,
+/// so the width is exact for whatever font and language are in use and
+/// Puron never measures a text itself. Over a value in a column it makes
+/// the value's box as wide as the widest text the box must hold, without
+/// making it higher. The texts are not drawn, nor offered to screen
+/// readers, as they are never shown.
+struct Widest<'a, M> {
+    texts: Vec<cosmic::Element<'a, M>>,
+}
+
+impl<'a, M> Widest<'a, M> {
+    fn new(texts: Vec<cosmic::Element<'a, M>>) -> Self {
+        Widest { texts }
+    }
+}
+
+impl<M> Widget<M, cosmic::Theme, cosmic::Renderer> for Widest<'_, M> {
+    fn size(&self) -> Size<Length> {
+        Size::new(Length::Shrink, Length::Shrink)
+    }
+
+    fn children(&self) -> Vec<Tree> {
+        self.texts.iter().map(Tree::new).collect()
+    }
+
+    fn diff(&mut self, tree: &mut Tree) {
+        tree.diff_children(&mut self.texts);
+    }
+
+    fn layout(&mut self, tree: &mut Tree, renderer: &cosmic::Renderer, limits: &Limits) -> Node {
+        let width = self
+            .texts
+            .iter_mut()
+            .zip(&mut tree.children)
+            .map(|(t, tree)| {
+                t.as_widget_mut()
+                    .layout(tree, renderer, limits)
+                    .size()
+                    .width
+            })
+            .fold(0.0, f32::max);
+        Node::new(limits.resolve(Length::Shrink, Length::Shrink, Size::new(width, 0.0)))
+    }
+
+    fn draw(
+        &self,
+        _tree: &Tree,
+        _renderer: &mut cosmic::Renderer,
+        _theme: &cosmic::Theme,
+        _style: &renderer::Style,
+        _layout: Layout<'_>,
+        _cursor: mouse::Cursor,
+        _viewport: &Rectangle,
+    ) {
+    }
+}
+
+impl<'a, M: 'a> From<Widest<'a, M>> for cosmic::Element<'a, M> {
+    fn from(w: Widest<'a, M>) -> Self {
+        cosmic::Element::new(w)
     }
 }

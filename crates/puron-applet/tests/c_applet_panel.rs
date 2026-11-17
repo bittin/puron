@@ -2,7 +2,7 @@
 //! the panel plan alone; others lay out the widgets built from the plan
 //! in iced's headless test simulator and measure them. Unless a test says
 //! otherwise, the panel is of type Panel, at size M, and the text size is
-//! the default, the match value.
+//! the default, `TextSize::MatchPanel`.
 //! Unless a test says otherwise, the items come from
 //! `puron_core::panel::panel` with the captured readings and the pinned
 //! list `P1` of `pins.json`. The icon theme test runs in a fresh run of
@@ -673,7 +673,7 @@ fn mid_x(r: &Rectangle) -> f32 {
 
 /// On a panel of type Panel at size S (icon 20 px), with the dock's size
 /// fixed at 10 px, each of the eight panel text sizes in turn gives the
-/// plan a text size of 17 (the match value), 10, 12, 14, 16, 18, 20 and
+/// plan a text size of 17 (`TextSize::MatchPanel`), 10, 12, 14, 16, 18, 20 and
 /// 24 px. Then, with no readings and the pins of P5 at size M, both "⚠"
 /// texts are higher at 20 px than at 10 px.
 #[test]
@@ -733,7 +733,7 @@ fn c_applet_panel_18() {
     });
 }
 
-/// With the match value on a panel, the icon size that libcosmic gives
+/// With `TextSize::MatchPanel` on a panel, the icon size that libcosmic gives
 /// for the sizes XS, S, M, L and XL and for the custom sizes 16, 40 and
 /// 100 is 16, 20, 28, 32, 48, 8, 20 and 50 px, and the text size is seven
 /// eighths of it rounded down, at least 8: 14, 17, 24, 28, 42, 8, 17 and
@@ -758,7 +758,7 @@ fn c_applet_panel_19() {
     });
 }
 
-/// With the match value, icons on, on a horizontal panel at each size XS
+/// With `TextSize::MatchPanel`, icons on, on a horizontal panel at each size XS
 /// to XL: the panel is 32, 40, 56, 64 and 80 px thick; laid out alone,
 /// each text of the content is no higher than that, and the `CPU` text
 /// grows strictly from size to size; in the button, each text's vertical
@@ -887,7 +887,7 @@ fn c_applet_panel_22() {
 /// Settings loaded from a store written by the previous version (every
 /// other key of the `good` fixture, no text size entry), from an empty
 /// store, and from a store whose text size entries hold `Default` and
-/// `24`, all give the match value: on a panel and on a dock, 14 px at XS,
+/// `24`, all give `TextSize::MatchPanel`: on a panel and on a dock, 14 px at XS,
 /// 24 px at M and 42 px at XL, in all 18 plans.
 #[test]
 fn c_applet_panel_23() {
@@ -952,5 +952,421 @@ fn c_applet_panel_24() {
             heights.push(cpu_height(&mut sim, &plan));
         }
         assert!(heights[0] > heights[1], "CPU text heights {heights:?}");
+    });
+}
+
+// The tests below are of the value boxes. Unless a test says otherwise,
+// the items come from `puron_core::panel::panel` with the readings of
+// kinds.json, one of each class and family, all six pinned; the fan is
+// the fourth item.
+
+/// The identity of the fan reading of kinds.json.
+const FAN_ID: &str = "fan/lm-sensors/k3";
+
+/// The readings and the pinned list of kinds.json.
+fn kinds_json() -> (Vec<RawReading>, Vec<String>) {
+    let v: serde_json::Value = serde_json::from_str(&raw("kinds.json")).expect("parse kinds.json");
+    let readings = serde_json::from_value(v["R"].clone()).expect("readings");
+    let pins = serde_json::from_value(v["P"].clone()).expect("pinned list");
+    (readings, pins)
+}
+
+/// The readings of kinds.json with the fan at `rpm`, or with no value
+/// when `rpm` is `None`.
+fn kinds_fan(rpm: Option<f64>) -> Vec<RawReading> {
+    let (mut raw, _) = kinds_json();
+    raw.iter_mut().find(|r| r.key == "k3").expect("fan").value = rpm;
+    raw
+}
+
+/// The readings of kinds.json without the fan.
+fn kinds_no_fan() -> Vec<RawReading> {
+    let (mut raw, _) = kinds_json();
+    raw.retain(|r| r.key != "k3");
+    raw
+}
+
+/// The panels for `steps`, readings in turn, of the pins `pins` under
+/// `s`, with each panel's state passed on to the next.
+fn panels(steps: &[Vec<RawReading>], pins: &[String], s: &Settings) -> Vec<Panel> {
+    let mut state = State::default();
+    let mut out = Vec::new();
+    for raw in steps {
+        let p = puron_core::panel::panel(&menu::shown(raw, s), pins, s, &state);
+        state = p.state.clone();
+        out.push(p);
+    }
+    out
+}
+
+/// The panels of every pin of kinds.json with the fan at each of `rpms`
+/// in turn, under the default settings with icons on.
+fn fan_steps(rpms: &[f64]) -> Vec<Panel> {
+    let steps: Vec<Vec<RawReading>> = rpms.iter().map(|r| kinds_fan(Some(*r))).collect();
+    panels(&steps, &kinds_json().1, &settings(true))
+}
+
+/// The index in `plan.elements` of the text element of item `item`.
+fn text_of(plan: &Plan, item: usize) -> usize {
+    plan.elements
+        .iter()
+        .position(|e| matches!(e, Element::Text { item: i, .. } if *i == item))
+        .unwrap_or_else(|| panic!("no text for item {item}"))
+}
+
+/// The button of `plan` at `place`, in a viewport 2000 × 200 px, with the
+/// rectangles of the box and the value of item `item`'s text, and the
+/// button's own rectangle.
+struct Measured {
+    button: Rectangle,
+    rects: Vec<Rectangle>,
+    boxed: Rectangle,
+    value: Rectangle,
+}
+
+fn measure(plan: &Plan, place: &Place, item: usize) -> Measured {
+    let mut sim = in_button(plan, place);
+    let i = text_of(plan, item);
+    Measured {
+        button: bounds(&mut sim, Id::new("button")),
+        rects: rects(&mut sim, plan),
+        boxed: bounds(&mut sim, panel::element_id(i)),
+        value: bounds(&mut sim, panel::value_id(i)),
+    }
+}
+
+/// The widths of `texts`, each laid out alone as a text of `size` px, in
+/// one simulator beside the button of `plan` at `place`.
+fn widths_alone(plan: &Plan, place: &Place, texts: &[String], size: u16) -> Vec<f32> {
+    let mut children: Vec<cosmic::Element<'static, ()>> =
+        vec![container(panel::button(plan, place, ())).into()];
+    for (k, t) in texts.iter().enumerate() {
+        children.push(
+            container(cosmic::widget::text(t.clone()).size(size))
+                .id(Id::new(format!("alone{k}")))
+                .into(),
+        );
+    }
+    let all = cosmic::widget::column::with_children(children);
+    let mut sim: Sim = Simulator::with_size(Default::default(), Size::new(2000.0, 600.0), all);
+    (0..texts.len())
+        .map(|k| bounds(&mut sim, Id::new(format!("alone{k}"))).width)
+        .collect()
+}
+
+fn widest(widths: &[f32]) -> f32 {
+    widths.iter().copied().fold(0.0, f32::max)
+}
+
+fn right_edge(r: &Rectangle) -> f32 {
+    r.x + r.width
+}
+
+/// The box texts of each pin in the plan: for each class its box text
+/// with its unit, then the texts for no value and for a missing value.
+/// Without the fan's unit the fan's first text loses its unit. Under the
+/// Esperanto test catalog every text, the unit's and the two others',
+/// comes from that catalog.
+#[test]
+fn c_applet_panel_25() {
+    puron_testkit::limit("C-applet.panel-25", LIMIT, || {
+        let (raw, pins) = kinds_json();
+        let boxes = |s: &Settings| {
+            let p = puron_core::panel::panel(&menu::shown(&raw, s), &pins, s, &State::default());
+            panel::plan(&p, &m_place(Orientation::Horizontal), s).boxes
+        };
+        let with = |first: &str, none: &str, missing: &str| {
+            vec![first.to_string(), none.to_string(), missing.to_string()]
+        };
+        if std::env::var_os(CHILD).is_some() {
+            puron_applet::i18n::start_with(puron_applet::i18n::test_catalog::eo(), |n| {
+                std::env::var_os(n)
+            });
+            let eo = |first: &str| with(first, "EO N/A", "EO ⚠");
+            assert_eq!(
+                boxes(&settings(true)),
+                [
+                    eo("888EO °C"),
+                    eo("888EO °C"),
+                    eo("888EO °C"),
+                    eo("8888EO  rpm"),
+                    eo("+88.88EO V"),
+                    eo("+888.88EO W"),
+                ]
+            );
+            return;
+        }
+        let en = |first: &str| with(first, "N/A", "⚠");
+        assert_eq!(
+            boxes(&settings(true)),
+            [
+                en("888°C"),
+                en("888°C"),
+                en("888°C"),
+                en("8888 rpm"),
+                en("+88.88V"),
+                en("+888.88W"),
+            ]
+        );
+        let no_unit = Settings {
+            show_rotation_rate_unit: false,
+            ..settings(true)
+        };
+        assert_eq!(boxes(&no_unit)[3], en("8888"));
+        run_child_eo("c_applet_panel_25");
+    });
+}
+
+/// Runs `test` again in a fresh run of this test binary under the locale
+/// `eo`, where the test chooses the Esperanto test catalog, and fails when
+/// that run fails. The catalog can be chosen only once in a process.
+fn run_child_eo(test: &str) {
+    let mut cmd = puron_testkit::rerun_self(test);
+    for v in puron_testkit::loc::VARS {
+        cmd.env_remove(v);
+    }
+    for (k, v) in puron_testkit::loc::env("E1") {
+        cmd.env(k, v);
+    }
+    let out = cmd.env(CHILD, "1").output().expect("run child");
+    assert!(
+        out.status.success(),
+        "child {test}: {}\n{}{}",
+        out.status,
+        String::from_utf8_lossy(&out.stdout),
+        String::from_utf8_lossy(&out.stderr)
+    );
+}
+
+/// The fan at 1234 rpm, then at 0, with the state passed on: the fan's
+/// text element is as wide at 0 as at 1234.
+#[test]
+fn c_applet_panel_26() {
+    puron_testkit::limit("C-applet.panel-26", LIMIT, || {
+        let place = m_place(Orientation::Horizontal);
+        let p = fan_steps(&[1234.0, 0.0]);
+        let s = settings(true);
+        let at_1234 = measure(&panel::plan(&p[0], &place, &s), &place, 3);
+        let at_0 = measure(&panel::plan(&p[1], &place, &s), &place, 3);
+        assert!(
+            near(at_0.boxed.width, at_1234.boxed.width, 0.5),
+            "fan box {} at 0, {} at 1234",
+            at_0.boxed.width,
+            at_1234.boxed.width
+        );
+    });
+}
+
+/// The fan at 1234, 12000 and 0 rpm in turn: its box is wider at 12000
+/// than at 1234, and keeps that width at 0.
+#[test]
+fn c_applet_panel_27() {
+    puron_testkit::limit("C-applet.panel-27", LIMIT, || {
+        let place = m_place(Orientation::Horizontal);
+        let s = settings(true);
+        let w: Vec<f32> = fan_steps(&[1234.0, 12000.0, 0.0])
+            .iter()
+            .map(|p| measure(&panel::plan(p, &place, &s), &place, 3).boxed.width)
+            .collect();
+        assert!(w[1] > w[0], "fan box {} at 12000, {} at 1234", w[1], w[0]);
+        assert!(
+            near(w[2], w[1], 0.5),
+            "fan box {} at 0, {} at 12000",
+            w[2],
+            w[1]
+        );
+    });
+}
+
+/// At a text size of 20 px, from the start state, each box is exactly as
+/// wide as the widest of its box texts laid out alone at 20 px, under the
+/// default settings and in Fahrenheit with decimals. With the defaults,
+/// each temperature box is wider than its value, `40°C`, which has a digit
+/// fewer than the box text.
+#[test]
+fn c_applet_panel_28() {
+    puron_testkit::limit("C-applet.panel-28", LIMIT, || {
+        let place = m_place(Orientation::Horizontal);
+        let (raw, pins) = kinds_json();
+        let defaults = sized(TextSize::Px20, TextSize::MatchPanel);
+        let fahrenheit = Settings {
+            temperature_unit: puron_core::settings::TemperatureUnit::Fahrenheit,
+            show_decimals: true,
+            ..defaults.clone()
+        };
+        for (case, s) in [("defaults", &defaults), ("Fahrenheit", &fahrenheit)] {
+            let p = panels(&[raw.clone()], &pins, s).remove(0);
+            let plan = panel::plan(&p, &place, s);
+            assert_eq!(plan.text_size, 20);
+            for item in 0..p.items.len() {
+                let m = measure(&plan, &place, item);
+                let alone = widths_alone(&plan, &place, &plan.boxes[item], 20);
+                assert!(
+                    near(m.boxed.width, widest(&alone), 0.5),
+                    "{case}, item {item}: box {} against texts {alone:?}",
+                    m.boxed.width
+                );
+                if case == "defaults" && item < 3 {
+                    assert!(
+                        m.boxed.width > m.value.width,
+                        "temperature {item}: box {} against value {}",
+                        m.boxed.width,
+                        m.value.width
+                    );
+                }
+            }
+        }
+    });
+}
+
+/// Under the Esperanto test catalog, with the fan's unit hidden (box text
+/// `8888`): the fan at 1000 rpm, then with no value, then with no reading
+/// at all. The fan's box has the same width in the three cases, the width
+/// of the widest of `8888` and the catalog's texts for no value and for a
+/// missing value, each laid out alone; that is wider than `8888` alone.
+#[test]
+fn c_applet_panel_29() {
+    puron_testkit::limit("C-applet.panel-29", LIMIT, || {
+        if std::env::var_os(CHILD).is_none() {
+            return run_child_eo("c_applet_panel_29");
+        }
+        puron_applet::i18n::start_with(puron_applet::i18n::test_catalog::eo(), |n| {
+            std::env::var_os(n)
+        });
+        let place = m_place(Orientation::Horizontal);
+        let s = Settings {
+            show_rotation_rate_unit: false,
+            ..settings(true)
+        };
+        let steps = [kinds_fan(Some(1000.0)), kinds_fan(None), kinds_no_fan()];
+        let p = panels(&steps, &kinds_json().1, &s);
+        // A pin with no line follows the others, so the fan is found by its
+        // box text rather than by its place.
+        let mut w = Vec::new();
+        for p in &p {
+            let plan = panel::plan(p, &place, &s);
+            let fan = plan
+                .boxes
+                .iter()
+                .position(|b| b.first().map(String::as_str) == Some("8888"))
+                .expect("the fan's box texts");
+            w.push(measure(&plan, &place, fan).boxed.width);
+        }
+        let plan = panel::plan(&p[0], &place, &s);
+        let texts = ["8888", "EO N/A", "EO ⚠"].map(String::from).to_vec();
+        assert_eq!(plan.boxes[3], texts);
+        let alone = widths_alone(&plan, &place, &texts, plan.text_size);
+        for (k, w) in w.iter().enumerate() {
+            assert!(
+                near(*w, widest(&alone), 0.5),
+                "case {k}: box {w}, texts {alone:?}"
+            );
+        }
+        assert!(widest(&alone) > alone[0], "texts {alone:?}");
+    });
+}
+
+/// The fan at 0 rpm in its four-digit box: the value ends at the box's
+/// right edge, and starts at least 1 px right of the box's left edge.
+#[test]
+fn c_applet_panel_30() {
+    puron_testkit::limit("C-applet.panel-30", LIMIT, || {
+        let place = m_place(Orientation::Horizontal);
+        let p = fan_steps(&[0.0]);
+        let m = measure(&panel::plan(&p[0], &place, &settings(true)), &place, 3);
+        assert!(
+            near(right_edge(&m.value), right_edge(&m.boxed), 0.5),
+            "value right {}, box right {}",
+            right_edge(&m.value),
+            right_edge(&m.boxed)
+        );
+        assert!(
+            m.value.x >= m.boxed.x + 1.0,
+            "value left {}, box left {}",
+            m.value.x,
+            m.boxed.x
+        );
+    });
+}
+
+/// The fan at 1234 rpm, then at 0: the voltage's icon and text and the
+/// power's icon and text, the four elements after the fan's text, start
+/// where they started, and the button keeps its width.
+#[test]
+fn c_applet_panel_31() {
+    puron_testkit::limit("C-applet.panel-31", LIMIT, || {
+        let place = m_place(Orientation::Horizontal);
+        let s = settings(true);
+        let p = fan_steps(&[1234.0, 0.0]);
+        let plan = panel::plan(&p[0], &place, &s);
+        let fan = text_of(&plan, 3);
+        assert_eq!(
+            plan.elements.len(),
+            fan + 5,
+            "four elements after the fan's text"
+        );
+        let a = measure(&plan, &place, 3);
+        let b = measure(&panel::plan(&p[1], &place, &s), &place, 3);
+        for i in fan + 1..fan + 5 {
+            assert!(
+                near(b.rects[i].x, a.rects[i].x, 0.5),
+                "element {i} left {} at 0, {} at 1234",
+                b.rects[i].x,
+                a.rects[i].x
+            );
+        }
+        assert!(
+            near(b.button.width, a.button.width, 0.5),
+            "button {} at 0, {} at 1234",
+            b.button.width,
+            a.button.width
+        );
+    });
+}
+
+/// On a vertical panel, the fan pinned alone at 1234 rpm, then at 0: the
+/// button keeps its width; the fan's box is centred across the button
+/// within 1 px, and the value ends at the box's right edge. The button is
+/// measured inside a container that shrinks to it, so that its width
+/// follows its content.
+#[test]
+fn c_applet_panel_32() {
+    puron_testkit::limit("C-applet.panel-32", LIMIT, || {
+        let place = m_place(Orientation::Vertical);
+        let s = settings(true);
+        let steps = [kinds_fan(Some(1234.0)), kinds_fan(Some(0.0))];
+        let p = panels(&steps, &[FAN_ID.to_string()], &s);
+        let mut widths = Vec::new();
+        for (k, p) in p.iter().enumerate() {
+            let plan = panel::plan(p, &place, &s);
+            assert_eq!(plan.orientation, Orientation::Vertical);
+            let b = container(panel::button(&plan, &place, ()))
+                .width(Length::Shrink)
+                .id(Id::new("button"));
+            let mut sim: Sim =
+                Simulator::with_size(Default::default(), Size::new(2000.0, 600.0), b);
+            let button = bounds(&mut sim, Id::new("button"));
+            let i = text_of(&plan, 0);
+            let boxed = bounds(&mut sim, panel::element_id(i));
+            let value = bounds(&mut sim, panel::value_id(i));
+            assert!(
+                button.width < 2000.0,
+                "step {k}: the button fills the viewport"
+            );
+            assert!(
+                near(mid_x(&boxed), mid_x(&button), 1.0),
+                "step {k}: box centre {}, button centre {}",
+                mid_x(&boxed),
+                mid_x(&button)
+            );
+            assert!(
+                near(right_edge(&value), right_edge(&boxed), 0.5),
+                "step {k}: value right {}, box right {}",
+                right_edge(&value),
+                right_edge(&boxed)
+            );
+            widths.push(button.width);
+        }
+        assert!(near(widths[1], widths[0], 0.5), "button widths {widths:?}");
     });
 }

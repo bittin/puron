@@ -995,11 +995,12 @@ fn c_applet_app_32() {
 
 /// From the state of `c_applet_app_4`, a new panel text size (20 px) and
 /// then a new dock text size (10 px) arrive from the config. Neither asks
-/// the engine for anything, lays out the popup, rebuilds the panel items
-/// or logs `display-updated`; the app holds each new settings record at
+/// the engine for anything, lays out the popup or logs `display-updated`;
+/// each rebuilds the panel items once, from the same lines, so that the
+/// value boxes start again; the app holds each new settings record at
 /// once. The panel button's plan at panel size M, built from the app's
 /// state, then has 20 px text on a panel after both changes, and on a dock
-/// 24 px (the match value at M) after the first and 10 px after the
+/// 24 px (`TextSize::MatchPanel` at M) after the first and 10 px after the
 /// second.
 #[test]
 fn c_applet_app_33() {
@@ -1035,7 +1036,10 @@ fn c_applet_app_33() {
             let out = a.handle(ev);
             assert_eq!(commands(&out), [], "engine commands after {key}");
             assert!(!has_layout(&out), "a layout after {key}: {out:?}");
-            assert!(panel_of(&out).is_none(), "panel items after {key}");
+            let panels = out.iter().filter(|o| matches!(o, Output::Panel(_))).count();
+            assert_eq!(panels, 1, "panel outputs after {key}");
+            let p = panel_of(&out).expect("panel items");
+            assert_eq!(values(&p), ["73°C", "33°C"], "panel items after {key}");
             assert!(
                 !out.contains(&Output::Diag("display-updated")),
                 "display-updated after {key}"
@@ -1047,5 +1051,74 @@ fn c_applet_app_33() {
             assert_eq!(text(PanelType::Dock), on_dock, "on a dock after {key}");
         }
         assert_eq!(h.calls().len(), calls, "engine handle calls");
+    });
+}
+
+/// The fan's box text in a panel output whose only item is the fan, as
+/// the panel writes it in English, such as `8888 rpm`.
+fn fan_box(out: &[Output]) -> String {
+    let p = panel_of(out).expect("a panel output");
+    assert_eq!(p.boxes.len(), 1, "one item: {:?}", p.items);
+    puron_applet::i18n::value_text(Some(p.boxes[0].as_ref().expect("a box text")))
+}
+
+/// The readings of kinds.json, one of each class, with the fan at `rpm`.
+fn kinds_snapshot(rpm: f64) -> puron_engine::engine::Snapshot {
+    let text = std::fs::read_to_string(puron_testkit::fixture("raw", "kinds.json")).unwrap();
+    let v: serde_json::Value = serde_json::from_str(&text).unwrap();
+    let mut readings: Vec<puron_core::rows::RawReading> =
+        serde_json::from_value(v["R"].clone()).unwrap();
+    let fan = readings.iter_mut().find(|r| r.key == "k3").expect("fan");
+    fan.value = Some(rpm);
+    puron_engine::engine::Snapshot {
+        readings,
+        lm_sensors: puron_engine::engine::LmReport::Answered,
+    }
+}
+
+/// With only the fan of kinds.json pinned, the app starts (the fan shows
+/// "⚠" in a four-digit box), then gets the fan at 12000 rpm and at 0: the
+/// box grows to five digits and keeps them. A new panel text size makes
+/// new panel items at once, whose box is back at four digits, and the
+/// next reading at 0 keeps four. A second app on the same config, after
+/// the first has stopped, starts with four digits again: no box is
+/// stored with the settings.
+#[test]
+fn c_applet_app_34() {
+    use puron_core::settings::TextSize;
+    puron_testkit::limit("C-applet.app-34", LIMIT, || {
+        let c = cfg::build("p5");
+        let config = Config::new(c.root.clone());
+        let list = vec!["fan/lm-sensors/k3".to_string()];
+        let stored = config.store(puron_config::PINNED, &puron_config::Value::List(list));
+        assert_eq!(stored, StoreResult::Stored);
+        let h = handle(0);
+        let mut a = app(&c.root, &h);
+        let out = a.handle(Event::Start);
+        assert_eq!(values(&panel_of(&out).unwrap()), ["⚠"]);
+        assert_eq!(fan_box(&out), "8888 rpm", "at start");
+        let out = a.handle(Event::Snapshot(kinds_snapshot(12000.0)));
+        assert_eq!(fan_box(&out), "88888 rpm", "at 12000 rpm");
+        let out = a.handle(Event::Snapshot(kinds_snapshot(0.0)));
+        assert_eq!(fan_box(&out), "88888 rpm", "at 0 rpm");
+        let ev = delivery(&a, &["panel_text_size"], |s| {
+            s.panel_text_size = TextSize::Px20
+        });
+        let out = a.handle(ev);
+        assert_eq!(fan_box(&out), "8888 rpm", "after the new text size");
+        let out = a.handle(Event::Snapshot(kinds_snapshot(0.0)));
+        assert_eq!(
+            fan_box(&out),
+            "8888 rpm",
+            "at 0 rpm after the new text size"
+        );
+        a.handle(Event::Stop);
+
+        let h = handle(0);
+        let mut b = app(&c.root, &h);
+        let out = b.handle(Event::Start);
+        assert_eq!(fan_box(&out), "8888 rpm", "at the second start");
+        let out = b.handle(Event::Snapshot(kinds_snapshot(0.0)));
+        assert_eq!(fan_box(&out), "8888 rpm", "at 0 rpm after the second start");
     });
 }

@@ -32,6 +32,7 @@ impl View {
                 items: Vec::new(),
                 padding: 0,
                 state: Default::default(),
+                boxes: Vec::new(),
             },
             pinned: Vec::new(),
             settings: Settings::default(),

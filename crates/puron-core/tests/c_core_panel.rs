@@ -4,6 +4,8 @@
 //! dupes.json, rebuild.json, pins.json, kinds.json, cpu.json). Unless a
 //! test says otherwise, the settings are the defaults and the icon memory
 //! starts empty.
+// A test name may carry a case after two underscores.
+#![allow(non_snake_case)]
 
 use std::collections::BTreeMap;
 
@@ -11,7 +13,7 @@ use puron_core::format::{Text, Unit};
 use puron_core::menu::{self, Entry, IconKind, Report};
 use puron_core::panel::{self, Icon, Item, Panel, State};
 use puron_core::rows::{Kind, RawReading};
-use puron_core::settings::{Settings, TemperatureUnit};
+use puron_core::settings::{Settings, TemperatureUnit, TextSize};
 
 const LIMIT: u64 = 2;
 
@@ -539,5 +541,313 @@ fn c_core_panel_20() {
             items(&skipped, &one, &none).as_slice(),
             [Item::Pin { value: None, .. }]
         ));
+    });
+}
+
+// The tests below are of the boxes: the box text that each pin item gets,
+// whose width its value's box keeps on the panel, and the box memory that
+// lets a box grow but never shrink. They use the readings of kinds.json,
+// one of each class and family, all six pinned.
+
+/// The identity of the fan reading of kinds.json.
+const FAN: &str = "fan/lm-sensors/k3";
+
+/// The readings and the pinned list of kinds.json.
+fn kinds() -> (Vec<RawReading>, Vec<String>) {
+    #[derive(serde::Deserialize)]
+    struct Kinds {
+        #[serde(rename = "R")]
+        readings: Vec<RawReading>,
+        #[serde(rename = "P")]
+        pinned: Vec<String>,
+    }
+    let k: Kinds = json("kinds.json");
+    (k.readings, k.pinned)
+}
+
+/// The readings of kinds.json with the fan at `rpm`.
+fn fan_at(rpm: f64) -> Vec<RawReading> {
+    let (mut raw, _) = kinds();
+    let fan = raw.iter_mut().find(|r| r.key == "k3").expect("fan reading");
+    fan.value = Some(rpm);
+    raw
+}
+
+/// The readings of kinds.json without the fan.
+fn no_fan() -> Vec<RawReading> {
+    let (mut raw, _) = kinds();
+    raw.retain(|r| r.key != "k3");
+    raw
+}
+
+fn all_pins() -> Vec<String> {
+    kinds().1
+}
+
+/// Each item as its value and its box text, such as `1234rpm 8888rpm`:
+/// `⚠` for a pin with no line, `-` for no box text, and `empty` for the
+/// empty-state item.
+fn boxed(p: &Panel) -> Vec<String> {
+    assert_eq!(p.boxes.len(), p.items.len(), "one box text per item");
+    p.items
+        .iter()
+        .zip(&p.boxes)
+        .map(|(i, b)| match i {
+            Item::EmptyState => "empty".to_string(),
+            Item::Pin { value, .. } => {
+                let value = value.as_ref().map_or("⚠".to_string(), text);
+                let b = b
+                    .as_ref()
+                    .map_or("-".to_string(), |t| text(&Some(t.clone())));
+                format!("{value} {b}")
+            }
+        })
+        .collect()
+}
+
+/// The fan's item, as `boxed` writes it, found by the unit of its box
+/// text; `None` when no item has a box text in rpm.
+fn fan_item(p: &Panel) -> Option<String> {
+    let at = p
+        .boxes
+        .iter()
+        .position(|b| b.as_ref().and_then(|t| t.unit) == Some(Unit::Rpm))?;
+    Some(boxed(p)[at].clone())
+}
+
+/// Runs the pins of kinds.json with the fan at 12000 rpm, then at 0, and
+/// returns the second panel, whose fan box has grown to five digits.
+fn grown(settings: &Settings) -> Panel {
+    let first = run(&fan_at(12000.0), &all_pins(), settings, &State::default());
+    let second = run(&fan_at(0.0), &all_pins(), settings, &first.state);
+    assert_eq!(fan_item(&second).as_deref(), Some("0rpm 88888rpm"));
+    second
+}
+
+/// The fan's value goes 1234, 0, 12000, 0, 9999.9 rpm, with the state
+/// passed on each time. Its box text starts at four digits, does not
+/// shrink at 0, grows to five at 12000 and stays at five after it; a
+/// 9999.9 rpm reading shows as 9999 and changes nothing. The other five
+/// pins keep the box texts of their classes throughout.
+#[test]
+fn c_core_panel_21() {
+    puron_testkit::limit("C-core.panel-21", LIMIT, || {
+        let steps = [
+            (1234.0, "1234rpm 8888rpm"),
+            (0.0, "0rpm 8888rpm"),
+            (12000.0, "12000rpm 88888rpm"),
+            (0.0, "0rpm 88888rpm"),
+            (9999.9, "9999rpm 88888rpm"),
+        ];
+        let mut state = State::default();
+        for (rpm, fan) in steps {
+            let p = run(&fan_at(rpm), &all_pins(), &Settings::default(), &state);
+            assert_eq!(
+                boxed(&p),
+                [
+                    "40°C 888°C",
+                    "40°C 888°C",
+                    "40°C 888°C",
+                    fan,
+                    "+12.00V +88.88V",
+                    "+10.00W +888.88W",
+                ],
+                "fan at {rpm}"
+            );
+            state = p.state;
+        }
+    });
+}
+
+/// From the start state, the box text of each class: three digits for a
+/// temperature, four for a fan, two for a voltage and three for a power,
+/// with the sign, decimals and unit that the values of the class show
+/// under the settings. Then pins with no line: the fan's and the CPU
+/// group's Maximum line still get the box text of their class, which comes
+/// from the pinned text, and a text that is no identity gets none.
+#[test]
+fn c_core_panel_22() {
+    puron_testkit::limit("C-core.panel-22", LIMIT, || {
+        let boxes = |s: &Settings| -> Vec<String> {
+            let p = run(&kinds().0, &all_pins(), s, &State::default());
+            p.boxes
+                .iter()
+                .map(|b| text(&Some(b.clone().expect("a box text"))))
+                .collect()
+        };
+        assert_eq!(
+            boxes(&Settings::default()),
+            ["888°C", "888°C", "888°C", "8888rpm", "+88.88V", "+888.88W"]
+        );
+        let fahrenheit = settings_with(|s| {
+            s.temperature_unit = TemperatureUnit::Fahrenheit;
+            s.show_decimals = true;
+        });
+        assert_eq!(
+            boxes(&fahrenheit),
+            ["888.8°F", "888.8°F", "888.8°F", "8888rpm", "+88.88V", "+888.88W"]
+        );
+        let no_units = settings_with(|s| {
+            s.show_temperature_unit = false;
+            s.show_rotation_rate_unit = false;
+            s.show_voltage_unit = false;
+            s.show_power_unit = false;
+        });
+        assert_eq!(
+            boxes(&no_units),
+            ["888", "888", "888", "8888", "+88.88", "+888.88"]
+        );
+        let pins: Vec<String> = [FAN, "@maximum/cpu", "not-an-identity"]
+            .map(String::from)
+            .to_vec();
+        let p = run(&[], &pins, &Settings::default(), &State::default());
+        assert_eq!(boxed(&p), ["⚠ 8888rpm", "⚠ 888°C", "⚠ -"]);
+    });
+}
+
+/// From a state whose fan box has grown to five digits, a change of any
+/// of the eight settings that change the value texts or their size starts
+/// every box again: with the fan at 0 the box is back at four digits.
+/// A change of another setting keeps the grown box. A start counts the
+/// value shown at once, so 12000 rpm under a new text size keeps five
+/// digits, and the next call with the same settings is no new start.
+#[test]
+fn c_core_panel_23() {
+    puron_testkit::limit("C-core.panel-23", LIMIT, || {
+        let base = Settings::default();
+        let fan_box = |p: &Panel| boxed(p)[3].clone();
+        let changes: [(&str, fn(&mut Settings), &str); 10] = [
+            (
+                "temperature_unit",
+                |s| s.temperature_unit = TemperatureUnit::Fahrenheit,
+                "0rpm 8888rpm",
+            ),
+            ("show_decimals", |s| s.show_decimals = true, "0rpm 8888rpm"),
+            (
+                "show_temperature_unit",
+                |s| s.show_temperature_unit = false,
+                "0rpm 8888rpm",
+            ),
+            (
+                "show_rotation_rate_unit",
+                |s| s.show_rotation_rate_unit = false,
+                "0 8888",
+            ),
+            (
+                "show_voltage_unit",
+                |s| s.show_voltage_unit = false,
+                "0rpm 8888rpm",
+            ),
+            (
+                "show_power_unit",
+                |s| s.show_power_unit = false,
+                "0rpm 8888rpm",
+            ),
+            (
+                "panel_text_size",
+                |s| s.panel_text_size = TextSize::Px20,
+                "0rpm 8888rpm",
+            ),
+            (
+                "dock_text_size",
+                |s| s.dock_text_size = TextSize::Px10,
+                "0rpm 8888rpm",
+            ),
+            (
+                "poll_interval_secs",
+                |s| s.poll_interval_secs = 7,
+                "0rpm 88888rpm",
+            ),
+            (
+                "show_panel_icons",
+                |s| s.show_panel_icons = false,
+                "0rpm 88888rpm",
+            ),
+        ];
+        for (key, change, want) in changes {
+            let from = grown(&base);
+            let mut s = base.clone();
+            change(&mut s);
+            let p = run(&fan_at(0.0), &all_pins(), &s, &from.state);
+            assert_eq!(fan_box(&p), want, "after a change of {key}");
+        }
+        let px20 = settings_with(|s| s.panel_text_size = TextSize::Px20);
+        let at_12000 = run(&fan_at(12000.0), &all_pins(), &px20, &grown(&base).state);
+        assert_eq!(fan_box(&at_12000), "12000rpm 88888rpm");
+        let again = run(&fan_at(0.0), &all_pins(), &px20, &at_12000.state);
+        assert_eq!(fan_box(&again), "0rpm 88888rpm");
+    });
+}
+
+/// From a state whose fan box has grown to five digits: (a) unpinned, the
+/// fan gives no item and the state keeps no box for it; pinned again, at
+/// the end of the list, its box is back at four digits. (b) Hidden with
+/// the fan class switched off, the same; shown again, four digits.
+/// (c) When the fan's reading disappears, its item shows "⚠" and keeps
+/// the grown box, which it still has when the reading comes back at 0.
+#[test]
+fn c_core_panel_24() {
+    puron_testkit::limit("C-core.panel-24", LIMIT, || {
+        let s = Settings::default();
+        let without: Vec<String> = all_pins().into_iter().filter(|id| id != FAN).collect();
+        let a = run(&fan_at(0.0), &without, &s, &grown(&s).state);
+        assert_eq!(fan_item(&a), None, "(a) a fan item while unpinned");
+        assert!(
+            !a.state.boxes.contains_key(FAN),
+            "(a) a box kept while unpinned"
+        );
+        let mut back = without.clone();
+        back.push(FAN.to_string());
+        let a = run(&fan_at(0.0), &back, &s, &a.state);
+        assert_eq!(
+            fan_item(&a).as_deref(),
+            Some("0rpm 8888rpm"),
+            "(a) pinned again"
+        );
+
+        let hidden = settings_with(|s| s.show_rotation_rate = false);
+        let b = run(&fan_at(0.0), &all_pins(), &hidden, &grown(&s).state);
+        assert_eq!(b.items.len(), 5, "(b) the fan item while hidden");
+        assert!(
+            !b.state.boxes.contains_key(FAN),
+            "(b) a box kept while hidden"
+        );
+        let b = run(&fan_at(0.0), &all_pins(), &s, &b.state);
+        assert_eq!(
+            fan_item(&b).as_deref(),
+            Some("0rpm 8888rpm"),
+            "(b) shown again"
+        );
+
+        let c = run(&no_fan(), &all_pins(), &s, &grown(&s).state);
+        assert_eq!(fan_item(&c).as_deref(), Some("⚠ 88888rpm"), "(c) missing");
+        let c = run(&fan_at(0.0), &all_pins(), &s, &c.state);
+        assert_eq!(fan_item(&c).as_deref(), Some("0rpm 88888rpm"), "(c) back");
+    });
+}
+
+/// From a state whose fan box has grown to five digits, every class is
+/// switched off, so the panel shows only the empty-state item: the state
+/// then keeps no box at all. With every class shown again and the fan at
+/// 0, the fan's box is back at four digits.
+#[test]
+fn c_core_panel_24__empty_state() {
+    puron_testkit::limit("C-core.panel-24", LIMIT, || {
+        let s = Settings::default();
+        let none_shown = settings_with(|s| {
+            s.show_temperature = false;
+            s.show_rotation_rate = false;
+            s.show_voltage = false;
+            s.show_power = false;
+        });
+        let empty = run(&fan_at(0.0), &all_pins(), &none_shown, &grown(&s).state);
+        assert_eq!(boxed(&empty), ["empty"]);
+        assert!(
+            empty.state.boxes.is_empty(),
+            "boxes kept: {:?}",
+            empty.state.boxes
+        );
+        let back = run(&fan_at(0.0), &all_pins(), &s, &empty.state);
+        assert_eq!(fan_item(&back).as_deref(), Some("0rpm 8888rpm"));
     });
 }

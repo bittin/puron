@@ -272,6 +272,7 @@ impl App {
                 items: Vec::new(),
                 padding: 0,
                 state: State::default(),
+                boxes: Vec::new(),
             },
             menu: None,
             pinned: Vec::new(),
@@ -509,8 +510,9 @@ impl App {
     /// asks for one lays out at once instead. A
     /// change of whether unit suffixes are shown lays out at once. A change
     /// of the panel icons, or a pinned list taken from another process
-    /// during `NewInstall`, rebuilds only the panel. A change of a text
-    /// size needs nothing here: the panel button reads it from the
+    /// during `NewInstall`, rebuilds only the panel. So does a change of a
+    /// text size, so that every value's box starts again at the width of
+    /// the new size; the panel button reads the size itself from the
     /// settings at its next drawing, which the new settings cause.
     fn delivery(&mut self, d: Delivery, out: &mut Vec<Output>) {
         // A list written from outside during a new install is taken as a
@@ -551,6 +553,12 @@ impl App {
         let none_on = !registry::PROVIDERS
             .iter()
             .any(|e| registry::switch(n, e.provider));
+        // A new text size needs new panel items, as a change of the panel
+        // icons does: the same lines give the same items, but every value's
+        // box starts again at the width of the new size, and a box grown
+        // under the old size gives up its extra width.
+        let icons =
+            icons || o.panel_text_size != n.panel_text_size || o.dock_text_size != n.dock_text_size;
         if interval {
             self.handle.set_interval(n.poll_interval_secs);
             out.push(Output::Engine(Command::SetInterval(n.poll_interval_secs)));

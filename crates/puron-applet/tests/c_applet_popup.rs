@@ -959,7 +959,7 @@ fn c_applet_popup_24() {
 
 /// The popup that the applet draws from its state at panel size M, with
 /// the pinned list `P1`, is the same whatever the text size settings hold:
-/// with both at 14 px, both at 24 px and both at the match value, each on
+/// with both at 14 px, both at 24 px and both at `TextSize::MatchPanel`, each on
 /// a panel and on a dock, the six plans are equal, and every entry's
 /// rectangle and the popup's width equal those of the first (within
 /// 0.5 px).
@@ -1015,5 +1015,70 @@ fn c_applet_popup_25() {
                 }
             }
         }
+    });
+}
+
+/// The popup that the applet draws from its state at panel size M, with
+/// the fan of kinds.json pinned, after the fan reads 12000 rpm, then 1234,
+/// then 0, the state passed on: the fan's line shows each value, its
+/// value is narrower at 0 than at 1234 although the panel's box for the
+/// fan has grown to five digits, and the value ends at the line's right
+/// content edge each time.
+#[test]
+fn c_applet_popup_26() {
+    use puron_applet::panel::{Orientation, Place};
+    use puron_applet::view::View;
+    puron_testkit::limit("C-applet.popup-26", LIMIT, || {
+        setup();
+        let v: serde_json::Value = serde_json::from_str(&raw("kinds.json")).unwrap();
+        let readings: Vec<RawReading> = serde_json::from_value(v["R"].clone()).unwrap();
+        let pins = vec!["fan/lm-sensors/k3".to_string()];
+        let s = Settings::default();
+        let place = Place {
+            orientation: Orientation::Horizontal,
+            ..Place::of(&Context {
+                size: AppletSize::PanelSize(PanelSize::M),
+                ..Context::default()
+            })
+        };
+        let mut state = State::default();
+        let mut last: Option<Key> = None;
+        let mut widths = Vec::new();
+        for (rpm, want) in [(12000.0, "12000 rpm"), (1234.0, "1234 rpm"), (0.0, "0 rpm")] {
+            let mut raw = readings.clone();
+            raw.iter_mut().find(|r| r.key == "k3").unwrap().value = Some(rpm);
+            let shown = menu::shown(&raw, &s);
+            let m = menu::menu(&shown, &s, Report::Answered, last.as_ref(), false);
+            last = Some(m.key.clone());
+            let p = puron_core::panel::panel(&shown, &pins, &s, &state);
+            state = p.state.clone();
+            let view = View {
+                menu: Some(m),
+                panel: p,
+                pinned: pins.clone(),
+                settings: s.clone(),
+            };
+            let plan = view.popup_plan(&place).expect("a layout");
+            let i = plan
+                .entries
+                .iter()
+                .position(|e| matches!(e, Drawn::Line(l) if l.identity == pins[0]))
+                .expect("the fan's line");
+            let Drawn::Line(l) = &plan.entries[i] else {
+                unreachable!()
+            };
+            assert_eq!(l.value, want);
+            let mut sim = simulate_at(&plan, view.popup_width(&place));
+            let line = bounds(&mut sim, popup::entry_id(i));
+            let value = element(&mut sim, i, "value");
+            let edge = right(&line) - applet::menu_control_padding().right;
+            assert!(
+                near(right(&value), edge, 0.5),
+                "{want}: value right {}, content edge {edge}",
+                right(&value)
+            );
+            widths.push(value.width);
+        }
+        assert!(widths[2] < widths[1], "value widths {widths:?}");
     });
 }
