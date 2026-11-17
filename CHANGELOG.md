@@ -4,6 +4,22 @@ The notable changes of each Puron release. Versions follow
 [Semantic Versioning](https://semver.org/), and the format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [1.4.0] - 2026-11-17
+
+### Added
+
+- Display Options has two new settings, "Panel Text Size" and "Dock Text Size", for the size of the values on the panel
+  button. The first applies when Puron is on a panel, the second when it is on a dock. Each can hold a fixed size from
+  10 to 24 px.
+
+### Changed
+
+- By default the text follows the size of the panel or dock ("Match panel size", "Match dock size"), so that it grows
+  with the icons. On the smallest panel it stays 14 px, as before; on a larger panel or dock it is larger after the
+  update. Choose a fixed size of 14 px to keep the old look.
+- On a horizontal panel, a text taller than the panel is cut evenly at the panel's top and bottom edges, instead of
+  making Puron taller than the panel.
+
 ## [1.3.2] - 2026-11-16
 
 ### Changed
