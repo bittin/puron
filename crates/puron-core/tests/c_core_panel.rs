@@ -705,6 +705,9 @@ fn c_core_panel_22() {
     });
 }
 
+/// A setting's name, a change of it, and the fan item that follows.
+type Change = (&'static str, fn(&mut Settings), &'static str);
+
 /// From a state whose fan box has grown to five digits, a change of any
 /// of the eight settings that change the value texts or their size starts
 /// every box again: with the fan at 0 the box is back at four digits.
@@ -716,7 +719,7 @@ fn c_core_panel_23() {
     puron_testkit::limit("C-core.panel-23", LIMIT, || {
         let base = Settings::default();
         let fan_box = |p: &Panel| boxed(p)[3].clone();
-        let changes: [(&str, fn(&mut Settings), &str); 10] = [
+        let changes: [Change; 10] = [
             (
                 "temperature_unit",
                 |s| s.temperature_unit = TemperatureUnit::Fahrenheit,

@@ -1195,7 +1195,7 @@ fn c_applet_panel_28() {
             ..defaults.clone()
         };
         for (case, s) in [("defaults", &defaults), ("Fahrenheit", &fahrenheit)] {
-            let p = panels(&[raw.clone()], &pins, s).remove(0);
+            let p = panels(std::slice::from_ref(&raw), &pins, s).remove(0);
             let plan = panel::plan(&p, &place, s);
             assert_eq!(plan.text_size, 20);
             for item in 0..p.items.len() {
