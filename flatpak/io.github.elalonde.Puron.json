@@ -15,7 +15,7 @@
     "--filesystem=xdg-config/cosmic:rw",
     "--filesystem=host-etc:ro",
     "--system-talk-name=org.freedesktop.UDisks2",
-    "--talk-name=com.system76.CosmicSettingsDaemon",
+    "--talk-name=com.system76.CosmicSettingsDaemon.*",
     "--env=SENSORS_SYSFS_ROOT=/sys"
   ],
   "build-options": {

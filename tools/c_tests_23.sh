@@ -4,6 +4,12 @@
 # its two modules. The permissions are the promise that the Flatpak makes
 # to its users: exactly seven, so that Puron gets no network access, can
 # start no program outside the sandbox and can write only its settings.
+# The session bus permission must keep its trailing ".*": the COSMIC
+# settings daemon sends each configuration change, the desktop theme
+# among them, from a bus name of its own under
+# com.system76.CosmicSettingsDaemon, and with the bare name the sandbox
+# blocks those names, so the applet never sees the theme change. The
+# ".*" form also covers the daemon's own name and no unrelated one.
 # Beside them stands one environment setting and no other,
 # SENSORS_SYSFS_ROOT=/sys, which grants no access: in the sandbox /sys
 # is a tmpfs that holds the sysfs folders, and libsensors refuses to
@@ -43,7 +49,7 @@ check '(."finish-args" | sort) == ([
     "--filesystem=xdg-config/cosmic:rw",
     "--filesystem=host-etc:ro",
     "--system-talk-name=org.freedesktop.UDisks2",
-    "--talk-name=com.system76.CosmicSettingsDaemon",
+    "--talk-name=com.system76.CosmicSettingsDaemon.*",
     "--env=SENSORS_SYSFS_ROOT=/sys"
   ] | sort)' "finish-args are not the seven permissions and the one --env"
 check '[."finish-args"[] | select(startswith("--env="))] == ["--env=SENSORS_SYSFS_ROOT=/sys"]' \
