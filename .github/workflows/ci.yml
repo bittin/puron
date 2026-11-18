@@ -145,12 +145,15 @@ jobs:
 
       # The same tools and the same remote as the COSMIC Flatpak
       # repository's own CI. The remote is added for the user because the
-      # build installs the runtime and the SDK for the user.
+      # build installs the runtime and the SDK for the user. The
+      # recommended packages are installed too: flatpak-builder strips the
+      # binaries with eu-strip from elfutils, which is only a
+      # recommendation, and the build fails without it.
       - name: Install flatpak-builder
         if: steps.changes.outputs.build == 'true'
         run: |
           sudo apt-get update
-          sudo apt-get install --yes --no-install-recommends \
+          sudo apt-get install --yes \
             flatpak flatpak-builder python3-aiohttp python3-tomlkit
           flatpak remote-add --if-not-exists --user flathub https://dl.flathub.org/repo/flathub.flatpakrepo
 
