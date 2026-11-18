@@ -99,3 +99,78 @@ jobs:
       # run here.
       - name: make check
         run: make check
+
+  flatpak:
+    # Builds the Flatpak from this tree, runs the sandbox probe on its
+    # build directory, and keeps the bundle. It is
+    # a job of this workflow, not a workflow of its own, so that one green
+    # run on a release commit covers the Flatpak too. A full build takes
+    # long, so a push builds only when it changes a file that goes into
+    # the Flatpak or into its build.
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      # A pull request always builds, and so does a push whose previous
+      # commit is not in the history (a new branch). Any other push builds
+      # when it changes the manifest, the data files, the lock file, the
+      # workspace manifest, the changelog that the release notes come
+      # from, the Makefile that installs the files, this workflow or a
+      # Flatpak script. A version commit changes Cargo.lock, so every
+      # release commit is built.
+      - name: Decide whether to build
+        id: changes
+        env:
+          EVENT: ${{ github.event_name }}
+          BEFORE: ${{ github.event.before }}
+          SHA: ${{ github.sha }}
+        run: |
+          build=true
+          if [ "$EVENT" = push ] && git cat-file -e "$BEFORE^{commit}" 2> /dev/null; then
+            if git diff --name-only "$BEFORE" "$SHA" \
+                | grep -Eq '^(flatpak/|data/|tools/flatpak-|(Cargo\.lock|Cargo\.toml|CHANGELOG\.md|Makefile|\.github/workflows/ci\.yml)$)'; then
+              build=true
+            else
+              build=false
+            fi
+          fi
+          echo "build=$build"
+          echo "build=$build" >> "$GITHUB_OUTPUT"
+
+      # The same tools and the same remote as the COSMIC Flatpak
+      # repository's own CI. The remote is added for the user because the
+      # build installs the runtime and the SDK for the user.
+      - name: Install flatpak-builder
+        if: steps.changes.outputs.build == 'true'
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends \
+            flatpak flatpak-builder python3-aiohttp python3-tomlkit
+          flatpak remote-add --if-not-exists --user flathub https://dl.flathub.org/repo/flathub.flatpakrepo
+
+      - name: Build the Flatpak
+        if: steps.changes.outputs.build == 'true'
+        run: PURON_FLATPAK_INSTALL_DEPS=1 PURON_FLATPAK_DIR="$RUNNER_TEMP/flatpak" sh tools/flatpak-build.sh "$RUNNER_TEMP/puron.flatpak"
+
+      # The runner has no desktop session, so the probe runs on the build
+      # directory, where the journal and the icon theme lines are skipped.
+      - name: Probe the sandbox
+        if: steps.changes.outputs.build == 'true'
+        run: sh tools/flatpak-probe.sh --build-dir "$RUNNER_TEMP/flatpak/build"
+
+      # The bundle is kept for testing only; a release attaches no Flatpak,
+      # because a bundle gets no updates and the store delivers the app.
+      - name: Keep the bundle
+        if: steps.changes.outputs.build == 'true'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: puron-flatpak
+          path: ${{ runner.temp }}/puron.flatpak
+          retention-days: 14
+          if-no-files-found: error
