@@ -10,8 +10,13 @@
 # flatpak-builder installs the missing ones from Flathub instead.
 #
 # The build runs with the options of the COSMIC Flatpak repository's own
-# build, --sandbox among them, so that a manifest that builds here builds
-# there too. Its state, the build directory and the repository are kept
+# build, so that a manifest that builds here builds there too, with one
+# exception: it runs without --sandbox. The manifest's source is this
+# tree, the folder above the manifest's folder, and flatpak-builder
+# refuses a source outside the manifest's folder in a sandboxed build.
+# The copy of the manifest for that repository takes the source from git
+# instead, so the repository still builds it with --sandbox.
+# Its state, the build directory and the repository are kept
 # outside the tree, in PURON_FLATPAK_DIR (default
 # ~/.cache/puron-flatpak). The build has no time limit.
 # Exits 0 when every step did, and prints the bundle's path, size and
@@ -48,7 +53,7 @@ sh tools/flatpak-cargo-sources.sh || exit 1
 mkdir -p "$dir" || exit 2
 # $deps is either empty or one word, so it is left unquoted on purpose.
 # shellcheck disable=SC2086
-flatpak-builder --user --sandbox --force-clean $deps \
+flatpak-builder --user --force-clean $deps \
     --state-dir="$dir/state" --repo="$dir/repo" "$dir/build" "$manifest" \
     || { echo "flatpak-build: flatpak-builder failed"; exit 1; }
 flatpak build-bundle "$dir/repo" "$bundle" "$app" \
