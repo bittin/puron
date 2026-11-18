@@ -15,10 +15,11 @@ SCRIPT_CHECKS := tools/lint-a.sh tools/c_tests_1.sh tools/c_tests_2.sh tools/c_t
     tools/c_i18n_11.sh tools/c_settings_window_15.sh tools/c_settings_window_17.sh \
     tools/read-only-run.sh tools/c_applet_panel_15.sh \
     tools/c_tests_18.sh tools/c_tests_19.sh tools/c_tests_20.sh tools/c_tests_21.sh \
-    tools/c_tests_22.sh
+    tools/c_tests_22.sh tools/c_tests_23.sh tools/c_tests_24.sh tools/c_tests_25.sh \
+    tools/c_tests_26.sh tools/c_tests_27.sh
 
 .PHONY: check setup deb check-deb source-archive install install-bin install-icons install-desktop \
-    install-appicon install-metainfo
+    install-appicon install-metainfo install-licenses install-license-texts install-notices
 
 # make install puts the two binaries, Puron's icon files, the desktop
 # entry, the app icon and the AppStream metainfo under
@@ -72,6 +73,48 @@ install-appicon:
 install-metainfo:
 	install -d $(DESTDIR)$(PREFIX)/share/metainfo
 	install -m 644 data/$(APP_ID).metainfo.xml $(DESTDIR)$(PREFIX)/share/metainfo/
+
+# make install-licenses puts the Flatpak's license files in
+# share/licenses/<app ID>, where Flatpak keeps them: Puron's LICENSE, the
+# GPL-3.0 text, the source offer and the third-party notices. The
+# lm-sensors license is written there by the Flatpak's libsensors module.
+# It is not part of install, because the Debian package keeps these files
+# in /usr/share/doc/puron, written by tools/make-deb.sh. Its first part
+# needs no build and no vendored crates, so a check can run it alone.
+#
+# The source offer is the Debian package's, followed by a paragraph on the
+# lm-sensors library that the Flatpak bundles. The lm-sensors tag and
+# commit come from the Flatpak manifest through tools/lm-sensors-ref.sh,
+# so that they are written in one file only. When the Flatpak is built on
+# the COSMIC base app, the notice on that app's icon themes joins them.
+#
+# install-notices needs VENDOR_DIR, the folder of the vendored crates; it
+# runs the same notices generator as the Debian package.
+LICENSE_DIR := $(PREFIX)/share/licenses/$(APP_ID)
+ICON_THEMES_NOTICE := $(wildcard flatpak/icon-themes-notice.txt)
+
+install-licenses: install-license-texts install-notices
+
+install-license-texts:
+	install -d $(DESTDIR)$(LICENSE_DIR)
+	install -m 644 LICENSE data/licenses/GPL-3.0.txt $(DESTDIR)$(LICENSE_DIR)/
+	ref=$$(sh tools/lm-sensors-ref.sh) || exit 1; \
+	version=$$(sed -n 's/^version = "\(.*\)"$$/\1/p' Cargo.toml | head -n 1); \
+	[ -n "$$version" ] || { echo "install-license-texts: no version in Cargo.toml"; exit 1; }; \
+	{ sed "s|@VERSION@|$$version|g" debian/source-offer.in && echo && \
+	    sed -e "s|@LMS_TAG@|$${ref% *}|g" -e "s|@LMS_COMMIT@|$${ref#* }|g" \
+	        flatpak/source-offer-libsensors.in; } > $(DESTDIR)$(LICENSE_DIR)/SOURCE-OFFER
+	chmod 644 $(DESTDIR)$(LICENSE_DIR)/SOURCE-OFFER
+	$(if $(ICON_THEMES_NOTICE),install -m 644 $(ICON_THEMES_NOTICE) \
+	    $(DESTDIR)$(LICENSE_DIR)/ICON-THEMES-NOTICE.txt)
+
+install-notices:
+	@[ -n "$(VENDOR_DIR)" ] || { echo "install-notices: set VENDOR_DIR"; exit 1; }
+	install -d $(DESTDIR)$(LICENSE_DIR) $(TARGET_DIR)
+	cargo metadata --offline --locked --format-version 1 > $(TARGET_DIR)/notices-metadata.json
+	python3 -I tools/gen-notices.py $(VENDOR_DIR) $(TARGET_DIR)/notices-metadata.json \
+	    $(DESTDIR)$(LICENSE_DIR)/THIRD-PARTY-NOTICES.txt
+	chmod 644 $(DESTDIR)$(LICENSE_DIR)/THIRD-PARTY-NOTICES.txt
 
 check:
 	cargo fmt --all --check

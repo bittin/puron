@@ -9,7 +9,9 @@
 # metainfo's id and launchable, the two app icon files, the settings ID
 # in crates/puron-config/src/lib.rs (under which both packages keep the
 # settings) and, once the directory flatpak/ exists, the Flatpak
-# manifest's file name and id.
+# manifest's file name and id. The manifest must be the one JSON file
+# there, so that no second manifest can name another ID; the cargo
+# source list that the Flatpak build writes beside it is not counted.
 # Exits 0, or 1 naming the first failed check.
 # Usage: tools/c_tests_20.sh
 cd "$(dirname "$0")/.." || exit 2
@@ -49,7 +51,7 @@ n=$(grep -cxF "pub const CONFIG_ID: &str = \"$a\";" crates/puron-config/src/lib.
 [ "$n" = 1 ] || fail "CONFIG_ID in crates/puron-config/src/lib.rs is not $a"
 if [ -d flatpak ]; then
     jq --version > /dev/null 2>&1 || { echo "HOST NEED jq"; exit 1; }
-    manifests=$(find flatpak -maxdepth 1 -name '*.json' | LC_ALL=C sort | tr '\n' ' ')
+    manifests=$(find flatpak -maxdepth 1 -name '*.json' ! -name cargo-sources.json | LC_ALL=C sort | tr '\n' ' ')
     [ "$manifests" = "flatpak/$a.json " ] || fail "the JSON files of flatpak/ are '$manifests', want flatpak/$a.json"
     [ "$(jq -r .id "flatpak/$a.json")" = "$a" ] || fail "the id of flatpak/$a.json is not $a"
 fi

@@ -3,6 +3,9 @@
 
 Usage: tools/gen-notices.py <vendor dir> <metadata.json> <output file>
 (tools/vendor-tree.sh makes the first two). Run from the repository root.
+The vendor dir is that of cargo vendor --versioned-dirs, as the Debian
+package and the source archive make it, or that of the Flatpak build,
+where flatpak-cargo-generator.py puts the crates.
 
 Every crate of Cargo.lock gets a block with its license, its source and
 the license and copyright files it ships. A crate that ships none takes
@@ -43,17 +46,50 @@ def license_files(folder):
                   and os.path.isfile(os.path.join(folder, f)))
 
 
-def repository_files(manifest):
-    """The license files of the nearest folder above a git crate."""
+def repository_files(manifest, top=None):
+    """The license files of the nearest folder above a git crate.
+
+    The search stops at the top of the crate's repository: the folder
+    that holds .git, or top when the caller knows it. A crate at the top
+    of its repository has no folder above it to search."""
     d = os.path.dirname(os.path.dirname(manifest))
     while d != "/":
+        if top and os.path.commonpath([d, top]) != top:
+            break
         found = license_files(d)
         if found:
             return [(f, read(os.path.join(d, f))) for f in found]
-        if os.path.exists(os.path.join(d, ".git")):
+        if os.path.exists(os.path.join(d, ".git")) or d == top:
             break
         d = os.path.dirname(d)
     return []
+
+
+def generator_clone(vendor, name, source):
+    """For a git crate of the Flatpak build: its Cargo.toml in the clone
+    of its repository, and the top of that clone.
+
+    flatpak-cargo-generator.py copies a git crate to <vendor>/<name>, with
+    no version, out of a clone that it keeps in
+    flatpak-cargo/git/<repository>-<first 7 digits of the commit>, two
+    folders above the vendor folder. Files at the top of the repository,
+    where workspaces often keep the license, are only in that clone. The
+    walk up from the copy would instead reach the folder of Puron's own
+    build and take Puron's LICENSE for the crate's. Returns (None, None)
+    when there is no such clone."""
+    url, commit = source[len("git+"):].split("#", 1)
+    repo = url.split("?")[0].rstrip("/").rsplit("/", 1)[-1].removesuffix(".git")
+    if "://github.com/" in url:
+        repo = repo.lower()
+    top = os.path.normpath(os.path.join(vendor, os.pardir, os.pardir, "flatpak-cargo",
+                                        "git", f"{repo}-{commit[:7]}"))
+    for d, dirs, files in os.walk(top):
+        dirs[:] = sorted(x for x in dirs if x != ".git")
+        if "Cargo.toml" in files:
+            with open(os.path.join(d, "Cargo.toml"), "rb") as f:
+                if tomllib.load(f).get("package", {}).get("name") == name:
+                    return os.path.join(d, "Cargo.toml"), top
+    return None, None
 
 
 def standard_text(expr, authors):
@@ -98,12 +134,25 @@ def main(vendor, metadata, out):
                           f"Text: {ref('LICENSE', read('LICENSE'))}\n")
             continue
         folder = os.path.join(vendor, f"{name}-{ver}")
+        texts_folder = folder
+        top = None
+        manifest = manifests.get((name, ver))
+        if not os.path.isdir(folder) and source.startswith("git+"):
+            # The Flatpak build's layout: see generator_clone. The license
+            # files are read in the clone, because the copy keeps a
+            # crate's symbolic links, and a link such as LICENSE ->
+            # ../LICENSE points nowhere once the crate is copied alone.
+            folder = os.path.join(vendor, name)
+            manifest, top = generator_clone(vendor, name, source)
+            if not manifest:
+                sys.exit(f"gen-notices: no clone of the repository of {name} {ver}")
+            texts_folder = os.path.dirname(manifest)
         with open(os.path.join(folder, "Cargo.toml"), "rb") as f:
             pkg = tomllib.load(f)["package"]
-        files = [(f, read(os.path.join(folder, f))) for f in license_files(folder)]
+        files = [(f, read(os.path.join(texts_folder, f))) for f in license_files(texts_folder)]
         how = ""
         if not files and source.startswith("git+"):
-            files = repository_files(manifests[(name, ver)])
+            files = repository_files(manifest, top)
             how = "from its repository: "
         expr = pkg.get("license") or clarify.get(f"{name}@{ver}") or clarify.get(name)
         if not expr:

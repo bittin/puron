@@ -137,6 +137,23 @@ listed in `Cargo.lock`:
 
     make deb      # writes the package to target/deb/
 
+`make source-archive` writes the release's source archive to
+`target/source/`. It needs network access too: besides the crates, it
+fetches the source of the lm-sensors release that the Flatpak bundles.
+
+To build the Flatpak, you need flatpak, flatpak-builder, git, curl, and
+python3 with its modules aiohttp and tomlkit (Debian: python3-aiohttp,
+python3-tomlkit), the Flathub remote, and network access. The build uses
+the runtime `org.freedesktop.Platform` and the SDK `org.freedesktop.Sdk`
+of the branch named in `flatpak/io.github.elalonde.Puron.json`, with the
+SDK extensions listed there; the script says which of them are missing,
+or installs them from Flathub with `PURON_FLATPAK_INSTALL_DEPS=1`. The
+script builds in `~/.cache/puron-flatpak` and writes one bundle file,
+which you then install for your user:
+
+    sh tools/flatpak-build.sh        # writes /tmp/puron-test.flatpak
+    flatpak install --user /tmp/puron-test.flatpak
+
 ## Test
 
     make setup    # once per clone: enables the commit-msg hook

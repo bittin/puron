@@ -1,0 +1,6 @@
+This Flatpak also holds libsensors, the library of lm-sensors
+(LGPL-2.1-or-later), built without changes from the lm-sensors tag
+@LMS_TAG@, commit @LMS_COMMIT@. Its complete source is in the same
+archive, in the directory lm-sensors-@LMS_TAG@, and at
+https://github.com/lm-sensors/lm-sensors. The programs load it as a
+shared library, /app/lib/libsensors.so.5, which a user can replace.
