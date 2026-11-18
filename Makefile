@@ -16,7 +16,8 @@ SCRIPT_CHECKS := tools/lint-a.sh tools/c_tests_1.sh tools/c_tests_2.sh tools/c_t
     tools/read-only-run.sh tools/c_applet_panel_15.sh \
     tools/c_tests_18.sh tools/c_tests_19.sh tools/c_tests_20.sh tools/c_tests_21.sh \
     tools/c_tests_22.sh tools/c_tests_23.sh tools/c_tests_24.sh tools/c_tests_25.sh \
-    tools/c_tests_26.sh tools/c_tests_27.sh tools/c_tests_28.sh tools/c_tests_29.sh
+    tools/c_tests_26.sh tools/c_tests_27.sh tools/c_tests_28.sh tools/c_tests_29.sh \
+    tools/c_tests_30.sh
 
 .PHONY: check setup deb check-deb source-archive install install-bin install-icons install-desktop \
     install-appicon install-metainfo install-licenses install-license-texts install-notices
