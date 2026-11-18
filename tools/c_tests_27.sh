@@ -11,8 +11,12 @@
 # placeholder filled: the version, the tag and the commit. Neither the
 # tag nor the commit may be written in the Makefile, the source archive
 # script or the paragraph's template, so that a new lm-sensors release
-# cannot leave one of them behind. The libsensors module must install
-# the lm-sensors license, which the LGPL asks to ship with the library.
+# cannot leave one of them behind. The Flatpak's libsensors carries one
+# patch, so both the paragraph's template and the installed offer must
+# name the patch file and must not claim the library is built without
+# changes: the LGPL asks that the source offered for a changed library
+# be the changed source. The libsensors module must install the
+# lm-sensors license, which the LGPL asks to ship with the library.
 # Exits 0, or 1 naming the first failed check.
 # Usage: tools/c_tests_27.sh
 cd "$(dirname "$0")/.." || exit 2
@@ -57,6 +61,11 @@ for f in Makefile tools/make-source-archive.sh flatpak/source-offer-libsensors.i
     for v in "$tag" "$commit"; do
         [ "$(grep -cF "$v" "$f")" = 0 ] || fail "$f names $v"
     done
+done
+for f in flatpak/source-offer-libsensors.in "$offer"; do
+    [ "$(grep -cF flatpak/lm-sensors-quiet-sysfs-root.patch "$f")" = 1 ] \
+        || fail "$f does not name flatpak/lm-sensors-quiet-sysfs-root.patch on exactly one line"
+    [ "$(grep -c 'without changes' "$f")" = 0 ] || fail "$f says the library is built without changes"
 done
 grep -q 'lm-sensors-ref\.sh' tools/make-source-archive.sh \
     || fail "tools/make-source-archive.sh does not take the release from tools/lm-sensors-ref.sh"

@@ -29,6 +29,13 @@
 # In the last two forms the script itself is fed to sh in the sandbox on
 # standard input, since the sandbox cannot see this tree.
 #
+# In the sandbox the script also starts the bundled libsensors once, the
+# way the programs start it, and reports what that start returned, how
+# many chips it found and how many bytes it wrote to standard error. A
+# library that cannot start shows no sensor rows at all, and one that
+# warns at each start fills the journal, since the applet starts it at
+# every poll; neither shows in the files alone.
+#
 # The journal socket and the host's icon themes are judged only for an
 # installed app: the sandbox of a build directory need not bind them the
 # way flatpak run does. runtime-libsensors is printed for the record and
@@ -66,6 +73,48 @@ cosmic_icon() {
     done
 }
 
+# Starts the bundled libsensors once and prints three lines: the value
+# that sensors_init returned, the count of chips it found (0 when the
+# start failed), and the count of bytes it wrote to standard error; "-"
+# for the first two when the start printed nothing, as without python3
+# or without the library. No variable is set here: the start must see
+# the sandbox's own environment, as the programs do.
+libsensors_start() {
+    err=$(mktemp 2> /dev/null) || {
+        printf 'libsensors-chips\t-\nlibsensors-init\t-\nlibsensors-stderr\t-\n'
+        return
+    }
+    # Standard input is the rest of this script when it runs in the
+    # sandbox, so the child must not be able to read it.
+    out=$(python3 -I -c '
+import ctypes
+try:
+    lib = ctypes.CDLL("/app/lib/libsensors.so.5")
+except OSError:
+    raise SystemExit(1)
+lib.sensors_init.argtypes = [ctypes.c_void_p]
+lib.sensors_init.restype = ctypes.c_int
+lib.sensors_get_detected_chips.argtypes = [ctypes.c_void_p, ctypes.POINTER(ctypes.c_int)]
+lib.sensors_get_detected_chips.restype = ctypes.c_void_p
+init = lib.sensors_init(None)
+chips = 0
+if init == 0:
+    nr = ctypes.c_int(0)
+    while lib.sensors_get_detected_chips(None, ctypes.byref(nr)) is not None:
+        chips += 1
+    lib.sensors_cleanup()
+print(init, chips)
+' < /dev/null 2> "$err")
+    init=- found=-
+    case $out in
+        *' '*) init=${out% *} found=${out#* } ;;
+    esac
+    printf 'libsensors-chips\t%s\n' "$found"
+    printf 'libsensors-init\t%s\n' "$init"
+    printf 'libsensors-stderr\t%s\n' "$(wc -c < "$err" | tr -d ' ')"
+    rm -f "$err"
+}
+
 collect() {
     case $1 in
         host) etc=/etc ;;
@@ -91,12 +140,7 @@ collect() {
         if [ "$1" = host ]; then
             printf 'cosmic-theme\t%s\n' "$(yes_no test -d /usr/share/icons/Cosmic)"
         else
-            # The bundled library must look for the configuration where
-            # the host's /etc appears in the sandbox, not in the runtime's
-            # own /etc, which has no lm-sensors configuration.
-            n=$(grep -ac /run/host/etc/sensors3.conf /app/lib/libsensors.so.5 2> /dev/null)
-            if [ "${n:-0}" -ge 1 ]; then l=yes; else l=no; fi
-            printf 'libsensors\t%s\n' "$l"
+            libsensors_start
             printf 'xdg-open\t%s\n' "$(yes_no command -v xdg-open)"
             printf 'liquidctl\t%s\n' "$(yes_no command -v liquidctl)"
             n=0
@@ -147,8 +191,17 @@ compare() {
         same "$k"
     done
 
+    # The bundled libsensors must start, silently, and find the chips.
+    # Not every hwmon device becomes a chip (libsensors skips devices it
+    # cannot place on a bus or that have no readable feature), and the
+    # host need not have a libsensors of its own to count them with, so
+    # the chip count is checked as a range: none when the host has no
+    # hwmon device, else at least one and at most one per device.
+    want libsensors-init 0
+    want libsensors-stderr 0
+    chips
+
     # What the Flatpak must hold, and the one program it must not.
-    want libsensors yes
     want xdg-open yes
     want liquidctl no
     want files 11
@@ -192,11 +245,37 @@ want() {
     if [ "$s" = "$2" ]; then echo "PROBE $1 ok"; else fail "$1" - "$s"; fi
 }
 
-# Compares the permissions in the flatpak keyfile $1 (a build
-# directory's metadata, or the output of flatpak info
-# --show-permissions) with the manifest's finish-args. Both are turned
-# into finish-args form, sorted, and joined with ",". ":rw" is dropped
-# because flatpak writes a read-write filesystem without it.
+# Checks the sandbox's chip count against the host's hwmon devices. The
+# failure line gives the host's device count as the host value.
+chips() {
+    if ! h=$(value hwmon "$host"); then
+        fail libsensors-chips "(none)" "$(value libsensors-chips "$sandbox" || echo "(none)")"
+        return
+    fi
+    if [ "$h" = - ]; then
+        n=0
+    else
+        n=$(printf '%s\n' "$h" | tr , '\n' | wc -l | tr -d ' ')
+    fi
+    s=$(value libsensors-chips "$sandbox") || s="(none)"
+    case $s in
+        '' | *[!0-9]*) fail libsensors-chips "$n" "$s"; return ;;
+    esac
+    if { [ "$n" = 0 ] && [ "$s" = 0 ]; } || { [ "$n" -ge 1 ] && [ "$s" -ge 1 ] && [ "$s" -le "$n" ]; }; then
+        echo "PROBE libsensors-chips ok"
+    else
+        fail libsensors-chips "$n" "$s"
+    fi
+}
+
+# Compares the permissions in the flatpak keyfile $1, the app's own
+# metadata, with the manifest's finish-args. Both are turned into
+# finish-args form, sorted, and joined with ",". ":rw" is dropped
+# because flatpak writes a read-write filesystem without it. Only the
+# app's metadata is read, never the merged view that adds the user's
+# and the system's overrides: an override is the machine owner's choice,
+# not something the Flatpak asked for, and a global one would otherwise
+# fail this check on that machine.
 permissions() {
     python3 -I -c '
 import configparser, json, sys
@@ -251,7 +330,7 @@ run() {
         flatpak run --command=sh "$app" -s -- --collect sandbox \
             < tools/flatpak-probe.sh > "$tmp/sandbox" 2> "$tmp/err"
         rc=$?
-        flatpak info --show-permissions "$app" > "$tmp/permissions" 2>> "$tmp/err"
+        flatpak info --show-metadata "$app" > "$tmp/permissions" 2>> "$tmp/err"
     fi
     if [ "$rc" != 0 ]; then
         echo "flatpak-probe: the sandbox did not start (exit $rc):"

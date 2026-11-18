@@ -1,6 +1,9 @@
 This Flatpak also holds libsensors, the library of lm-sensors
-(LGPL-2.1-or-later), built without changes from the lm-sensors tag
-@LMS_TAG@, commit @LMS_COMMIT@. Its complete source is in the same
-archive, in the directory lm-sensors-@LMS_TAG@, and at
-https://github.com/lm-sensors/lm-sensors. The programs load it as a
+(LGPL-2.1-or-later), built from the lm-sensors tag @LMS_TAG@, commit
+@LMS_COMMIT@, with one change: the patch
+flatpak/lm-sensors-quiet-sysfs-root.patch, which removes one warning
+message of lib/sysfs.c. Its complete source is in the same archive:
+the directory lm-sensors-@LMS_TAG@, with that patch in the directory
+flatpak; the tag is also at https://github.com/lm-sensors/lm-sensors
+and the patch in Puron's public repository. The programs load it as a
 shared library, /app/lib/libsensors.so.5, which a user can replace.

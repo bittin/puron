@@ -5,7 +5,10 @@
 # release's git source, with the tag v<version> and the given commit. Any
 # other difference, such as a lost permission or a "dir" source left next
 # to the git source, would ship a Flatpak that Puron's own build and CI
-# never built.
+# never built. The copy must keep the patch source of the module
+# "libsensors", which names a file beside the manifest; that file must be
+# tracked here, since the release tool copies it next to the copy from
+# the tag's tree.
 #
 # The script runs on this tree with the workspace version, and again on a
 # copy of the script and the manifest whose Cargo.toml has another version,
@@ -44,6 +47,8 @@ copy_ok() {
         "$tmp/copy.json" > /dev/null || fail "the first puron source of the copy for $2 is not the git source of v$2"
     jq -e '.modules[1].sources[1] == "cargo-sources.json"' "$tmp/copy.json" > /dev/null ||
         fail "the second puron source of the copy for $2 is not cargo-sources.json"
+    jq -e '.modules[0].sources[1] == {"type": "patch", "path": "lm-sensors-quiet-sysfs-root.patch"}' \
+        "$tmp/copy.json" > /dev/null || fail "the copy for $2 lacks the patch source of libsensors"
 }
 copy_ok . "$version"
 
@@ -68,6 +73,9 @@ wrong=0.0.1
 refused "version $wrong" "$wrong" "$commit"
 refused "a commit of 39 digits" "$version" aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
 refused "no argument"
+
+patch=flatpak/lm-sensors-quiet-sysfs-root.patch
+[ "$(git ls-files "$patch")" = "$patch" ] || fail "$patch is not a tracked file"
 
 [ -z "$(git ls-files flatpak/ | grep cosmic)" ] || fail "a tracked file under flatpak/ has cosmic in its name"
 echo "C-tests-30: ok"

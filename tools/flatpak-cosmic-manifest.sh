@@ -13,6 +13,10 @@
 # keeps one manifest, so the two can never disagree on the build steps or
 # the permissions. The copy is never edited by hand and never committed
 # here: the release tool writes it for the pull request to that repository.
+# The module "libsensors" keeps its patch source, which names
+# lm-sensors-quiet-sysfs-root.patch beside the manifest, so the copy
+# builds only with that file next to it; the release tool copies it
+# there from flatpak/ of the same tag.
 #
 # The version must be the workspace version of Cargo.toml, so that the tag
 # in the copy is the release that this tree is. The commit is the tag's

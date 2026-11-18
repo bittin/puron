@@ -4,6 +4,11 @@
 # its two modules. The permissions are the promise that the Flatpak makes
 # to its users: exactly seven, so that Puron gets no network access, can
 # start no program outside the sandbox and can write only its settings.
+# Beside them stands one environment setting and no other,
+# SENSORS_SYSFS_ROOT=/sys, which grants no access: in the sandbox /sys
+# is a tmpfs that holds the sysfs folders, and libsensors refuses to
+# start on a /sys that is not itself a sysfs mount unless the variable
+# names it.
 # The manifest may not hold build-args, because the COSMIC Flatpak
 # repository builds with flatpak-builder --sandbox, which refuses them.
 #
@@ -11,8 +16,12 @@
 # from the SDK itself or from one LLVM SDK extension; the check accepts
 # those two forms and no mix of them. libsensors must read the host's
 # lm-sensors configuration, which Flatpak shows at /run/host/etc, and
-# cargo must build offline from the vendored crates. The COSMIC base app
-# may join only together with the notice on its icon themes.
+# cargo must build offline from the vendored crates. libsensors is built
+# from the lm-sensors tag with one patch, which removes the warning that
+# the variable above would make it print at every start; the patch must be
+# a tracked file beside the manifest with exactly the reviewed content,
+# so its hash is pinned here. The COSMIC base app may join only together
+# with the notice on its icon themes.
 # Exits 0, or 1 naming the first failed check.
 # Usage: tools/c_tests_23.sh
 cd "$(dirname "$0")/.." || exit 2
@@ -34,8 +43,11 @@ check '(."finish-args" | sort) == ([
     "--filesystem=xdg-config/cosmic:rw",
     "--filesystem=host-etc:ro",
     "--system-talk-name=org.freedesktop.UDisks2",
-    "--talk-name=com.system76.CosmicSettingsDaemon"
-  ] | sort)' "finish-args are not the seven permissions"
+    "--talk-name=com.system76.CosmicSettingsDaemon",
+    "--env=SENSORS_SYSFS_ROOT=/sys"
+  ] | sort)' "finish-args are not the seven permissions and the one --env"
+check '[."finish-args"[] | select(startswith("--env="))] == ["--env=SENSORS_SYSFS_ROOT=/sys"]' \
+    "an --env entry other than SENSORS_SYSFS_ROOT=/sys"
 check '[.. | objects | has("build-args")] | any | not' "a build-args key"
 check '."sdk-extensions"[0] == "org.freedesktop.Sdk.Extension.rust-stable"' "the first SDK extension"
 # The SDK's own libclang: rust-stable alone. An LLVM extension: the same
@@ -63,11 +75,19 @@ check '[.modules[].name] == ["libsensors", "puron"]' "the modules are not libsen
 check '.modules[0]."build-commands"[0] == "make PREFIX=/app ETCDIR=/run/host/etc BUILD_STATIC_LIB=0 install-lib"' \
     "the libsensors build command"
 check '.modules[0].sources as $s |
-    ($s | length) == 1
+    ($s | length) == 2
+    and ($s[0] | type) == "object"
     and $s[0].type == "git"
     and $s[0].url == "https://github.com/lm-sensors/lm-sensors.git"
     and $s[0].tag == "V3-6-2"
-    and ($s[0].commit | test("^[0-9a-f]{40}$"))' "the libsensors source"
+    and ($s[0].commit | test("^[0-9a-f]{40}$"))' "the libsensors git source"
+check '.modules[0].sources[1] == {"type": "patch", "path": "lm-sensors-quiet-sysfs-root.patch"}' \
+    "the libsensors patch source"
+patch=flatpak/lm-sensors-quiet-sysfs-root.patch
+[ "$(git ls-files "$patch")" = "$patch" ] || fail "$patch is not a tracked file"
+sum=$(sha256sum < "$patch" | cut -d' ' -f1)
+[ "$sum" = 98778b36ccd144729c5249c2eb7041516dd5df2f2ce5d6b0c94323c31280cfe9 ] \
+    || fail "$patch has the SHA-256 $sum, not the reviewed one"
 if [ -f flatpak/icon-themes-notice.txt ]; then
     check '.base == "com.system76.Cosmic.BaseApp" and ."base-version" == "stable"' \
         "flatpak/icon-themes-notice.txt exists, but the base app is not the COSMIC one"

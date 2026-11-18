@@ -15,7 +15,8 @@
     "--filesystem=xdg-config/cosmic:rw",
     "--filesystem=host-etc:ro",
     "--system-talk-name=org.freedesktop.UDisks2",
-    "--talk-name=com.system76.CosmicSettingsDaemon"
+    "--talk-name=com.system76.CosmicSettingsDaemon",
+    "--env=SENSORS_SYSFS_ROOT=/sys"
   ],
   "build-options": {
     "append-path": "/usr/lib/sdk/rust-stable/bin:/usr/lib/sdk/llvm20/bin",
@@ -42,6 +43,10 @@
           "url": "https://github.com/lm-sensors/lm-sensors.git",
           "tag": "V3-6-2",
           "commit": "5c3ba50f806dea27c3b1e368966191c735459111"
+        },
+        {
+          "type": "patch",
+          "path": "lm-sensors-quiet-sysfs-root.patch"
         }
       ]
     },
