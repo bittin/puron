@@ -32,6 +32,22 @@ Puron is released as a Debian package for 64-bit x86 (amd64) systems.
 
 To build and install Puron from source instead, see Build below.
 
+## Flatpak
+
+Puron is also packaged as a Flatpak for the COSMIC Store, published in
+the COSMIC Flatpak repository, which the store reads. A release shows in
+the store when that repository has taken it in.
+
+The Flatpak does not read liquidctl devices; the Debian package does.
+
+The Flatpak and the Debian package share their settings: a move from one
+to the other keeps every setting and every pinned reading.
+
+The Flatpak's programs are licensed as the Debian package's are (see
+License). The Flatpak also holds the lm-sensors library, libsensors,
+which is LGPL-2.1-or-later; its source is in the release's source
+archive, `puron-<version>-source.tar.xz`.
+
 ## Use
 
 - The panel shows the readings that you have checked in the popup,

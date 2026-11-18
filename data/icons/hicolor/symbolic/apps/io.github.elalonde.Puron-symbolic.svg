@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16">
+  <!-- Puron app icon, symbolic form (MIT): the thermometer of the full
+       color icon alone, with the empty part of the tube cut out and three
+       tick marks beside it. The theme recolors the one fill. -->
+  <path fill="#000000" fill-rule="evenodd" d="M6 2A2 2 0 0 1 10 2V8.536A4 4 0 1 1 6 8.536ZM7 2H9V6H7ZM11 2H14V3H11ZM11 5H14V6H11ZM11 8H14V9H11Z"/>
+</svg>

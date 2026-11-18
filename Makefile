@@ -13,23 +13,31 @@ SCRIPT_CHECKS := tools/lint-a.sh tools/c_tests_1.sh tools/c_tests_2.sh tools/c_t
     tools/c_engine_15.sh tools/c_i18n_10.sh tools/c_i18n_15.sh \
     tools/c_tests_7.sh tools/c_applet_panel_10.sh tools/c_applet_app_19.sh \
     tools/c_i18n_11.sh tools/c_settings_window_15.sh tools/c_settings_window_17.sh \
-    tools/read-only-run.sh tools/c_applet_panel_15.sh
+    tools/read-only-run.sh tools/c_applet_panel_15.sh \
+    tools/c_tests_18.sh tools/c_tests_19.sh tools/c_tests_20.sh tools/c_tests_21.sh \
+    tools/c_tests_22.sh
 
-.PHONY: check setup deb check-deb source-archive install install-bin install-icons install-desktop
+.PHONY: check setup deb check-deb source-archive install install-bin install-icons install-desktop \
+    install-appicon install-metainfo
 
-# make install puts the two binaries, Puron's icon files and the desktop
-# entry under $(DESTDIR)$(PREFIX). The desktop entry is written from its
-# template with Exec taken from PREFIX (DESTDIR is not part of it).
-# tools/c_applet_panel_10.sh runs install-icons and
+# make install puts the two binaries, Puron's icon files, the desktop
+# entry, the app icon and the AppStream metainfo under
+# $(DESTDIR)$(PREFIX). It is the one install list of both packages: the
+# Debian package runs it with PREFIX=/usr and the Flatpak with
+# PREFIX=/app, so a file that either package needs gets a target here
+# and neither package copies files of its own. The desktop entry is
+# written from its template with Exec taken from PREFIX (DESTDIR is not
+# part of it). tools/c_applet_panel_10.sh runs install-icons and
 # tools/c_applet_panel_15.sh runs install, each into a temporary root.
 PREFIX ?= /usr
 ICON_DIR := $(PREFIX)/share/icons/hicolor/scalable/status
 APP_DIR := $(PREFIX)/share/applications
-DESKTOP := io.github.elalonde.Puron.desktop
+APP_ID := io.github.elalonde.Puron
+DESKTOP := $(APP_ID).desktop
 ICONS := $(wildcard data/icons/hicolor/scalable/status/*.svg)
 TARGET_DIR := $(or $(CARGO_TARGET_DIR),target)
 
-install: install-bin install-icons install-desktop
+install: install-bin install-icons install-desktop install-appicon install-metainfo
 
 install-bin:
 	cargo build --release --locked -p puron-applet -p puron-settings
@@ -45,6 +53,25 @@ install-desktop:
 	install -d $(DESTDIR)$(APP_DIR)
 	sed 's|@PREFIX@|$(PREFIX)|' data/$(DESKTOP).in > $(DESTDIR)$(APP_DIR)/$(DESKTOP)
 	chmod 644 $(DESTDIR)$(APP_DIR)/$(DESKTOP)
+
+# The app icon is the picture that software stores and COSMIC Settings
+# show for Puron, in full color and in a symbolic form. Flatpak exports
+# only icons whose names start with the app ID, which is why it is not
+# one of the panel's icons above.
+install-appicon:
+	install -d $(DESTDIR)$(PREFIX)/share/icons/hicolor/scalable/apps \
+	    $(DESTDIR)$(PREFIX)/share/icons/hicolor/symbolic/apps
+	install -m 644 data/icons/hicolor/scalable/apps/$(APP_ID).svg \
+	    $(DESTDIR)$(PREFIX)/share/icons/hicolor/scalable/apps/
+	install -m 644 data/icons/hicolor/symbolic/apps/$(APP_ID)-symbolic.svg \
+	    $(DESTDIR)$(PREFIX)/share/icons/hicolor/symbolic/apps/
+
+# The metainfo is what software stores read: name, description, links
+# and release notes. Its release notes are written from CHANGELOG.md by
+# tools/metainfo-releases.py, never by hand.
+install-metainfo:
+	install -d $(DESTDIR)$(PREFIX)/share/metainfo
+	install -m 644 data/$(APP_ID).metainfo.xml $(DESTDIR)$(PREFIX)/share/metainfo/
 
 check:
 	cargo fmt --all --check

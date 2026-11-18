@@ -25,9 +25,22 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install --yes --no-install-recommends \
-            clang dbus jq libsensors-dev libsensors5 libwayland-dev \
+            appstream clang dbus jq libsensors-dev libsensors5 libwayland-dev \
             libxkbcommon-dev lm-sensors locales pkg-config umockdev
           sudo locale-gen tr_TR.UTF-8 de_DE.UTF-8
+
+      # The desktop entry check needs a validator that knows the desktop
+      # category COSMIC, and Ubuntu 24.04 packages an older
+      # desktop-file-utils that calls it an error. The job therefore
+      # installs the package of Ubuntu 26.04, pinned by its SHA-256. It
+      # needs only glibc 2.34 and GLib 2.50, which this release has; dpkg
+      # fails the step when a dependency is not met.
+      - name: Install desktop-file-utils 0.28
+        run: |
+          curl -fsSL --retry 3 -o "$RUNNER_TEMP/desktop-file-utils.deb" \
+            https://archive.ubuntu.com/ubuntu/pool/main/d/desktop-file-utils/desktop-file-utils_0.28-1build1_amd64.deb
+          echo "4bc2c38ed9722d6ccdc7b27e77852f35363d06b8a8d786856aed4ffea98840b7  $RUNNER_TEMP/desktop-file-utils.deb" | sha256sum --check -
+          sudo dpkg --install "$RUNNER_TEMP/desktop-file-utils.deb"
 
       - name: Install the toolchain from rust-toolchain.toml
         run: |

@@ -2,7 +2,9 @@
 # Reads back the package that make deb built and checks it. It checks:
 # - the control fields (package, version, architecture, maintainer, and
 #   Depends with libsensors5 and libc6), every expected file and nothing
-#   more, the binaries' modes, and the desktop entry's Exec line;
+#   more (the two binaries, the desktop entry, the app icon in its two
+#   forms, the metainfo, the five documents and the panel icons), the
+#   binaries' modes, and the desktop entry's Exec line;
 # - the license documents: the GPL-3.0 text, the copyright paragraphs,
 #   the source offer, and the third-party notices against Cargo.lock,
 #   with the matching statements in README.md;
@@ -36,6 +38,9 @@ field Depends | tr ',' '\n' | sed 's/^ *//' | grep -qE '^libc6( |$)' || fail "De
 grep -q '^ Depends: ' "$tmp/info" || fail "no Depends line in --info"
 for p in usr/bin/puron-applet usr/bin/puron-settings \
     usr/share/applications/io.github.elalonde.Puron.desktop \
+    usr/share/metainfo/io.github.elalonde.Puron.metainfo.xml \
+    usr/share/icons/hicolor/scalable/apps/io.github.elalonde.Puron.svg \
+    usr/share/icons/hicolor/symbolic/apps/io.github.elalonde.Puron-symbolic.svg \
     usr/share/doc/puron/changelog.gz usr/share/doc/puron/copyright usr/share/doc/puron/GPL-3.0.txt \
     usr/share/doc/puron/SOURCE-OFFER usr/share/doc/puron/THIRD-PARTY-NOTICES.txt; do
     grep -qE " \./$p\$" "$tmp/contents" || fail "missing /$p"
@@ -46,7 +51,7 @@ for f in data/icons/hicolor/scalable/status/*.svg; do
 done
 grep -E '^-' "$tmp/contents" | grep -E ' \./usr/bin/' | grep -qvE '^-rwxr-xr-x root/root ' && fail "a binary is not -rwxr-xr-x root/root"
 n=$(grep -cE '^-' "$tmp/contents")
-want=$(( 8 + $(ls data/icons/hicolor/scalable/status/*.svg | wc -l) ))
+want=$(( 11 + $(ls data/icons/hicolor/scalable/status/*.svg | wc -l) ))
 [ "$n" = "$want" ] || fail "$n files, want $want"
 dpkg-deb -x "$deb" "$tmp/x" || fail "dpkg-deb -x"
 grep -qx 'Exec=/usr/bin/puron-applet' "$tmp/x/usr/share/applications/io.github.elalonde.Puron.desktop" \

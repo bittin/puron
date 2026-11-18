@@ -37,5 +37,11 @@ need "/bin/sh, mkfifo, setsid, pgrep, ps, /proc" \
     'test -x /bin/sh && command -v mkfifo setsid pgrep ps && test -d /proc/self'
 need "git" 'git --version'
 need "COSMIC icon theme" 'test -d /usr/share/icons/Cosmic'
+need "appstreamcli (AppStream 1.0 or later)" 'LC_ALL=C appstreamcli --version | grep -q "version: [1-9]"'
+# desktop-file-validate prints no version. Release 0.27 calls the desktop
+# category COSMIC an error and 0.28 accepts it, so the check asks the
+# validator to accept an entry in that category.
+need "desktop-file-validate (desktop-file-utils 0.28 or later)" \
+    'd=$(mktemp -d) && printf "[Desktop Entry]\nType=Application\nName=x\nExec=x\nCategories=COSMIC;\n" > $d/x.desktop && desktop-file-validate $d/x.desktop; r=$?; rm -rf $d; [ $r -eq 0 ]'
 
 exit $missing

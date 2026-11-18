@@ -1,0 +1,169 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>io.github.elalonde.Puron</id>
+  <name>Puron</name>
+  <summary>Monitor hardware sensors</summary>
+  <metadata_license>MIT</metadata_license>
+  <project_license>MIT AND GPL-3.0-only</project_license>
+  <developer id="io.github.elalonde">
+    <name>elalonde</name>
+  </developer>
+  <description>
+    <p>Puron shows temperatures, fan speeds, voltages and power readings in the panel and dock of the COSMIC™ desktop. Pin the readings that matter to the panel; the popup lists every sensor, grouped by device.</p>
+    <p>Puron reads lm-sensors, NVMe and SATA drives and NVIDIA GPUs. It only reads: it never changes a hardware setting.</p>
+    <p>The Flatpak package does not read liquidctl devices; the Debian package does.</p>
+  </description>
+  <launchable type="desktop-id">io.github.elalonde.Puron.desktop</launchable>
+  <categories>
+    <category>System</category>
+    <category>Monitor</category>
+  </categories>
+  <keywords>
+    <keyword>sensors</keyword>
+    <keyword>temperature</keyword>
+    <keyword>fan</keyword>
+    <keyword>voltage</keyword>
+    <keyword>lm-sensors</keyword>
+    <keyword>NVMe</keyword>
+    <keyword>NVIDIA</keyword>
+    <keyword>hardware</keyword>
+    <keyword>panel</keyword>
+  </keywords>
+  <url type="homepage">https://elalonde.dev/projects/puron/</url>
+  <url type="bugtracker">https://github.com/elalonde/puron/issues</url>
+  <url type="vcs-browser">https://github.com/elalonde/puron</url>
+  <provides>
+    <id>com.system76.CosmicApplet</id>
+    <binary>puron-applet</binary>
+    <binary>puron-settings</binary>
+  </provides>
+  <branding>
+    <color type="primary" scheme_preference="light">#f2b33d</color>
+    <color type="primary" scheme_preference="dark">#7a5515</color>
+  </branding>
+  <content_rating type="oars-1.1"/>
+  <releases>
+    <release version="1.5.0" date="2026-11-17">
+      <description>
+        <p>Changed</p>
+        <ul>
+          <li>The panel button keeps its width when a value gets shorter, so that the other sensors on the button and the applets beside Puron do not move when, for example, a fan drops from 1234 to 0 rpm.</li>
+          <li>Each value on the panel button sits in a box as wide as the widest normal value of its kind, such as 888°C for a temperature or 8888 rpm for a fan, and the value is aligned to the right of its box. Most buttons are therefore wider than before.</li>
+          <li>A box grows when a value needs more digits, such as a fan at 12000 rpm, and keeps that width. It becomes narrow again only when Puron starts, when a setting that changes the value texts or their size changes (the temperature unit, the decimals, showing or hiding a unit, or the panel or dock text size), or when the sensor leaves the panel button.</li>
+          <li>The same holds on a vertical panel or dock: each box has the same width as on a horizontal panel and is centered in the column.</li>
+        </ul>
+      </description>
+    </release>
+    <release version="1.4.0" date="2026-11-17">
+      <description>
+        <p>Added</p>
+        <ul>
+          <li>Display Options has two new settings, "Panel Text Size" and "Dock Text Size", for the size of the values on the panel button. The first applies when Puron is on a panel, the second when it is on a dock. Each can hold a fixed size from 10 to 24 px.</li>
+        </ul>
+        <p>Changed</p>
+        <ul>
+          <li>By default the text follows the size of the panel or dock ("Match panel size", "Match dock size"), so that it grows with the icons. On the smallest panel it stays 14 px, as before; on a larger panel or dock it is larger after the update. Choose a fixed size of 14 px to keep the old look.</li>
+          <li>On a horizontal panel, a text taller than the panel is cut evenly at the panel's top and bottom edges, instead of making Puron taller than the panel.</li>
+        </ul>
+      </description>
+    </release>
+    <release version="1.3.2" date="2026-11-16">
+      <description>
+        <p>Changed</p>
+        <ul>
+          <li>The program itself does not change: it is the same as in 1.3.1. Only the checks that come with the source tree change.</li>
+          <li>The commit-message hook, and tools/lint-a.sh, which checks comments and documentation, refuse more forms of internal reference numbers and tag names.</li>
+          <li>The commit-message hook accepts one more trailer, "Claude-Session:" followed by a web address on the same line.</li>
+          <li>One locale test gets ten minutes instead of two, so that it passes on a cold build, which starts from an empty target directory.</li>
+        </ul>
+      </description>
+    </release>
+    <release version="1.3.1" date="2026-11-13">
+      <description>
+        <p>Changed</p>
+        <ul>
+          <li>Third-party libraries are updated to their latest compatible releases, bringing upstream bug fixes.</li>
+        </ul>
+      </description>
+    </release>
+    <release version="1.3.0" date="2026-11-12">
+      <description>
+        <p>Added</p>
+        <ul>
+          <li>Sensor Settings has a new switch, "lm-sensors (drives only)", under Drive Sensor Providers. It is on by default. Turn it off and lm-sensors stops reading drive temperatures (NVMe drives, and SATA drives with the drivetemp module), so a disk that lm-sensors kept awake can spin down. The other lm-sensors readings stay. The switch has an effect only while lm-sensors is on.</li>
+          <li>The README shows the popup and the panel.</li>
+        </ul>
+      </description>
+    </release>
+    <release version="1.2.0" date="2026-11-10">
+      <description>
+        <p>Changed</p>
+        <ul>
+          <li>The last two entries of the popup are now "Settings" and then "About" (they were "Go to the Puron homepage" and then "Sensor Settings").</li>
+          <li>"About", and the message that offers the homepage, open the new project page, elalonde.dev/projects/puron/.</li>
+        </ul>
+      </description>
+    </release>
+    <release version="1.1.2" date="2026-11-08">
+      <description>
+        <p>Fixed</p>
+        <ul>
+          <li>With every sensor provider switched off, a change in Sensor Settings now updates the panel at once.</li>
+          <li>Closing Sensor Settings keeps a poll interval that was typed but not yet confirmed.</li>
+          <li>A failed save in Sensor Settings now shows "Settings could not be saved" until a save succeeds.</li>
+          <li>Without a user configuration directory, Puron and Sensor Settings no longer read or write settings in the current directory.</li>
+          <li>The diagnostics log no longer says a liquidctl run did not start when it started but could not be watched to its end.</li>
+        </ul>
+        <p>Changes to the repository only, not to the shipped program:</p>
+        <ul>
+          <li>The checks now verify the names of test time limits.</li>
+          <li>A test tool waits correctly for every provider's first report.</li>
+        </ul>
+      </description>
+    </release>
+    <release version="1.1.1" date="2026-11-08">
+      <description>
+        <p>Fixed</p>
+        <ul>
+          <li>A Maximum or CPU pin kept from version 1.0.0 that waits for lm-sensors now has a line in the popup, "CPU: waiting for lm-sensors"; click it to remove the pin.</li>
+          <li>A click in the popup no longer checks another line when the readings change just before the click.</li>
+        </ul>
+        <p>Changes to the repository only, not to the shipped program:</p>
+        <ul>
+          <li>The checks now include clippy.</li>
+          <li>Publishing a release retries reading back its new draft.</li>
+        </ul>
+      </description>
+    </release>
+    <release version="1.1.0" date="2026-11-07">
+      <description>
+        <p>Changed</p>
+        <ul>
+          <li>The popup shows everything at once, in the sections Temperature, Fan, Voltage and Power. Nothing opens or closes any more, so the arrows and the "Group Items" settings are gone.</li>
+          <li>Temperatures are listed by device: the CPU first, with every CPU reading under it, then GPUs, drives and other chips, each under its name, or the label you set in lm-sensors on a drive's "Composite" sensor.</li>
+          <li>A device with several readings also has a "Maximum" line, the highest of them at each poll, and marks one line "(default)": the CPU's package reading, a drive's composite reading, otherwise the first.</li>
+          <li>A click on a line checks it, and a checked line shows on the panel; several can be checked, and the panel shows them in popup order. A new install checks each "(default)" line. The Maximum that version 1.0.0 pinned moves to the CPU's default line, once.</li>
+          <li>With lm-sensors and the "nvme-cli" switch both on, a drive no longer shows the same reading twice: the lm-sensors line stays, and a pin on the other one moves to it.</li>
+          <li>The check mark is a small fixed size with a gap before the text, and section headings are drawn stronger.</li>
+          <li>Every line stays on one line. The popup grows to fit, and text over 44 characters is shortened with "…". A popup taller than its limit scrolls.</li>
+        </ul>
+        <p>Changes to the repository only, not to the shipped program:</p>
+        <ul>
+          <li>The checks run on GitHub Actions, and the README shows their status.</li>
+          <li>This changelog.</li>
+        </ul>
+      </description>
+    </release>
+    <release version="1.0.0" date="2026-11-05">
+      <description>
+        <p>First release.</p>
+        <ul>
+          <li>A panel applet for the COSMIC desktop that displays hardware sensor readings in the COSMIC Panel and Dock: component temperatures, fan speeds, voltages and liquid cooling statistics.</li>
+          <li>A settings application, puron-settings.</li>
+          <li>A Debian package for amd64, puron_1.0.0_amd64.deb.</li>
+          <li>The complete corresponding source as a release asset, puron-1.0.0-source.tar.xz, with the locked dependencies vendored for an offline build.</li>
+        </ul>
+      </description>
+    </release>
+  </releases>
+</component>

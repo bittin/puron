@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">
+  <!-- Puron app icon (MIT): a thermometer in front of a three-blade fan,
+       on a rounded tile that fades from teal to deep blue. The stores and
+       COSMIC Settings show it; the panel itself uses the symbolic icons.
+       The gradients use user space so that their ends sit at fixed
+       heights: the tile's top and bottom edges, and the top of the red
+       column and the bottom of the bulb. -->
+  <defs>
+    <linearGradient id="tile" gradientUnits="userSpaceOnUse" x1="0" y1="12" x2="0" y2="116">
+      <stop offset="0" stop-color="#2FB5A3"/>
+      <stop offset="1" stop-color="#1F5F8B"/>
+    </linearGradient>
+    <linearGradient id="filling" gradientUnits="userSpaceOnUse" x1="0" y1="50" x2="0" y2="94">
+      <stop offset="0" stop-color="#F2B33D"/>
+      <stop offset="1" stop-color="#E5533D"/>
+    </linearGradient>
+  </defs>
+  <rect x="12" y="12" width="104" height="104" rx="24" ry="24" fill="url(#tile)"/>
+  <!-- The fan: three overlapping rings around the bulb. -->
+  <circle cx="51" cy="74" r="13" fill="none" stroke="#7FD8CB" stroke-width="4"/>
+  <circle cx="77" cy="74" r="13" fill="none" stroke="#7FD8CB" stroke-width="4"/>
+  <circle cx="64" cy="97" r="13" fill="none" stroke="#7FD8CB" stroke-width="4"/>
+  <!-- The thermometer body: stem and bulb as one outline, so that no seam
+       shows where they meet. The stem's sides end where they cross the
+       bulb's circle. -->
+  <path fill="#F7F7F2" d="M55 27A9 9 0 0 1 73 27V67.578A17 17 0 1 1 55 67.578Z"/>
+  <!-- The filling: the bulb and the lower third of the stem, one shape. -->
+  <path fill="url(#filling)" d="M60 54A4 4 0 0 1 68 54V70.686A12 12 0 1 1 60 70.686Z"/>
+  <!-- The scale: three tick marks right of the stem. -->
+  <rect x="78" y="24" width="10" height="4" rx="2" ry="2" fill="#F7F7F2"/>
+  <rect x="78" y="36" width="10" height="4" rx="2" ry="2" fill="#F7F7F2"/>
+  <rect x="78" y="48" width="10" height="4" rx="2" ry="2" fill="#F7F7F2"/>
+</svg>
