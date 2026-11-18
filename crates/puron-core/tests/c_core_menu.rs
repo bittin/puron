@@ -9,9 +9,9 @@ use std::collections::BTreeMap;
 
 use puron_core::format::{Text, Unit};
 use puron_core::menu::{
-    self, Entry, Heading, Item, Key, LineWord, Menu, MessageKind, Report, Section, Update,
+    self, Entry, Heading, IconKind, Item, Key, LineWord, Menu, MessageKind, Report, Section, Update,
 };
-use puron_core::rows::{Provider, RawReading};
+use puron_core::rows::{Kind, Provider, RawReading};
 use puron_core::settings::{Settings, TemperatureUnit};
 
 const LIMIT: u64 = 2;
@@ -957,5 +957,207 @@ fn nvme_cli_line_names() {
             lines("lm-sensors-off"),
             ["S1 (default) 38°C", "S2 44°C", "Maximum 44°C"]
         );
+    });
+}
+
+/// A set of icons.json, whose readings each stand for one kind of device
+/// and carry a short name, such as `cp` or `w1`, that the tests use to
+/// find them.
+fn icons_set(set: &str) -> Vec<RawReading> {
+    sets("icons.json").remove(set).expect("X-raw-icons set")
+}
+
+/// The identity of the reading of `raw` named `name`, for any provider and
+/// class.
+fn any_id(raw: &[RawReading], name: &str) -> String {
+    let r = raw
+        .iter()
+        .find(|r| r.name.as_deref() == Some(name))
+        .unwrap_or_else(|| panic!("reading {name}"));
+    let class = match r.kind {
+        Some(Kind::Fan) => "fan",
+        Some(Kind::Voltage) => "voltage",
+        Some(Kind::Power) => "power",
+        _ => "temperature",
+    };
+    format!("{class}/{}/{}", r.provider.word(), r.key)
+}
+
+/// The icon kind of each line that `names` name, in order: a reading's
+/// short name, or an identity that starts with `@`. Every name must have
+/// a line at the default settings.
+fn kinds_of(raw: &[RawReading], names: &[&str]) -> Vec<IconKind> {
+    let shown = menu::shown(raw, &Settings::default());
+    names
+        .iter()
+        .map(|n| {
+            let id = if n.starts_with('@') {
+                n.to_string()
+            } else {
+                any_id(raw, n)
+            };
+            let line = shown.line(&id).unwrap_or_else(|| panic!("no line {id}"));
+            menu::icon_kind(line)
+        })
+        .collect()
+}
+
+/// The CPU group's readings, `cp`, `cc`, `ck` and `cb`, and its Maximum
+/// line show the CPU icon. `bo`, the board controller's reading of
+/// another part, sits on the same chip as `cb` but is not in the CPU
+/// group, so it gets the general thermometer: the CPU kind comes from the
+/// group, not from the chip name.
+#[test]
+fn c_core_menu_35() {
+    puron_testkit::limit("C-core.menu-35", LIMIT, || {
+        let raw = icons_set("kinds");
+        use IconKind::{CpuTemperature as Cpu, GeneralTemperature as General};
+        assert_eq!(
+            kinds_of(&raw, &["cp", "cc", "ck", "cb", "@maximum/cpu", "bo"]),
+            [Cpu, Cpu, Cpu, Cpu, Cpu, General]
+        );
+    });
+}
+
+/// The seven Wi-Fi chip names (Intel with and without an instance number,
+/// the three Qualcomm Atheros names, two MediaTek names) show the Wi-Fi
+/// sign. Names that only look alike get the general thermometer: one that
+/// starts with `iwlwifi` but not `iwlwifi_`, the wrong case, `ath10k`
+/// without `_hwmon`, a MediaTek name without `_phy`, with something after
+/// its digits or without its digits, and one that only contains
+/// `iwlwifi_1`.
+#[test]
+fn c_core_menu_36() {
+    puron_testkit::limit("C-core.menu-36", LIMIT, || {
+        let raw = icons_set("kinds");
+        let wifi = ["w1", "w2", "w3", "w4", "w5", "w6", "w7"];
+        assert_eq!(
+            kinds_of(&raw, &wifi),
+            [IconKind::WifiTemperature; 7],
+            "{wifi:?}"
+        );
+        let near = ["n1", "n2", "n3", "n4", "n5", "n6", "n10"];
+        assert_eq!(
+            kinds_of(&raw, &near),
+            [IconKind::GeneralTemperature; 7],
+            "{near:?}"
+        );
+    });
+}
+
+/// The three wired network chip names (`ixgbe`, `i350bb`, `bnxt_en`) show
+/// the network socket, a kind apart from Wi-Fi. `ixgbevf`, which only
+/// starts like `ixgbe`, gets the general thermometer.
+#[test]
+fn c_core_menu_37() {
+    puron_testkit::limit("C-core.menu-37", LIMIT, || {
+        let raw = icons_set("kinds");
+        assert_eq!(
+            kinds_of(&raw, &["e1", "e2", "e3", "n7"]),
+            [
+                IconKind::WiredNetworkTemperature,
+                IconKind::WiredNetworkTemperature,
+                IconKind::WiredNetworkTemperature,
+                IconKind::GeneralTemperature,
+            ]
+        );
+    });
+}
+
+/// The two memory module chip names (`jc42` for DDR4, `spd5118` for DDR5)
+/// show the memory module. `jc42x`, which only starts like `jc42`, and
+/// `xspd5118`, which only contains `spd5118`, get the general
+/// thermometer.
+#[test]
+fn c_core_menu_38() {
+    puron_testkit::limit("C-core.menu-38", LIMIT, || {
+        let raw = icons_set("kinds");
+        assert_eq!(
+            kinds_of(&raw, &["m1", "m2", "n8", "n9"]),
+            [
+                IconKind::MemoryTemperature,
+                IconKind::MemoryTemperature,
+                IconKind::GeneralTemperature,
+                IconKind::GeneralTemperature,
+            ]
+        );
+    });
+}
+
+/// GPU readings (an `amdgpu` chip, NVIDIA) show the GPU icon, and drive
+/// readings of every provider (an `nvme` chip, a `drivetemp` chip,
+/// udisks2, nvme-cli) the drive icon. `p1`, on a chip named both after a
+/// memory module and a drive, is a drive, because the drive family is
+/// tested first. A chipset, an ACPI zone, a board controller, a
+/// liquidctl cooler and an unknown chip get the general thermometer. A
+/// voltage on a Wi-Fi chip, a fan on a memory module and a power reading
+/// on a GPU keep the icons of their classes.
+#[test]
+fn c_core_menu_39() {
+    puron_testkit::limit("C-core.menu-39", LIMIT, || {
+        let raw = icons_set("kinds");
+        use IconKind::*;
+        assert_eq!(
+            kinds_of(&raw, &["ga", "gn"]),
+            [GpuTemperature, GpuTemperature]
+        );
+        assert_eq!(
+            kinds_of(&raw, &["dn", "dd", "du", "dc", "p1"]),
+            [DriveTemperature; 5]
+        );
+        assert_eq!(
+            kinds_of(&raw, &["o1", "o2", "o3", "o4", "o5"]),
+            [GeneralTemperature; 5]
+        );
+        assert_eq!(kinds_of(&raw, &["vw", "fm", "pa"]), [Voltage, Fan, Power]);
+    });
+}
+
+/// Each Maximum line of set `max`, whose devices each have two
+/// temperatures of one kind, has the kind of its device's lines. The rule
+/// for a group that mixes kinds: a Maximum line has the kind that all of
+/// its group's lines share, and the general thermometer when they differ,
+/// in either order, or when the group has no line.
+#[test]
+fn c_core_menu_40() {
+    puron_testkit::limit("C-core.menu-40", LIMIT, || {
+        let raw = icons_set("max");
+        use IconKind::*;
+        assert_eq!(
+            kinds_of(
+                &raw,
+                &[
+                    "@maximum/cpu",
+                    "@maximum/lm-sensors/amdgpu-pci-0300",
+                    "@maximum/lm-sensors/nvme-pci-0100",
+                    "@maximum/lm-sensors/ath11k_hwmon-pci-0500",
+                    "@maximum/lm-sensors/ixgbe-pci-0900",
+                    "@maximum/lm-sensors/jc42-i2c-0-18",
+                    "@maximum/lm-sensors/acpitz-acpi-0",
+                ]
+            ),
+            [
+                CpuTemperature,
+                GpuTemperature,
+                DriveTemperature,
+                WifiTemperature,
+                WiredNetworkTemperature,
+                MemoryTemperature,
+                GeneralTemperature,
+            ]
+        );
+        assert_eq!(
+            menu::maximum_kind(&[WifiTemperature, WifiTemperature]),
+            WifiTemperature
+        );
+        assert_eq!(
+            menu::maximum_kind(&[WifiTemperature, MemoryTemperature]),
+            GeneralTemperature
+        );
+        assert_eq!(
+            menu::maximum_kind(&[MemoryTemperature, WifiTemperature]),
+            GeneralTemperature
+        );
+        assert_eq!(menu::maximum_kind(&[]), GeneralTemperature);
     });
 }

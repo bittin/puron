@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16">
+  <!-- Puron icon (MIT): a memory module seen from the front (a board
+       with three chips, a comb of contacts with one notch). -->
+  <path fill="#000000" fill-rule="evenodd" d="M0 4h16v6H0zM2 5h3v3H2zM6.5 5h3v3h-3zM11 5h3v3h-3zM0.5 10h1v2h-1zM2.5 10h1v2h-1zM4.5 10h1v2h-1zM7.5 10h1v2h-1zM9.5 10h1v2h-1zM11.5 10h1v2h-1zM13.5 10h1v2h-1z"/>
+</svg>

@@ -30,7 +30,8 @@ pub const PADDING_WITHOUT_ICONS: u32 = 4;
 pub enum Icon {
     /// Panel icons are switched off (`Settings::show_panel_icons`).
     None,
-    /// The icon of the reading's class and family.
+    /// The icon of the reading's class and, for a temperature, of the
+    /// kind of its device.
     Kind(IconKind),
     /// Icons are on, but the pin's line has not been found since icons
     /// were switched on or the state was created, so its kind is unknown.

@@ -6,7 +6,7 @@
 
 use std::collections::BTreeMap;
 
-use puron_core::menu::{self, Device, Heading, LineWord, Shown, ShownLine};
+use puron_core::menu::{self, Device, Heading, IconKind, LineWord, Shown, ShownLine};
 use puron_core::pins;
 use puron_core::rows::{Class, Kind, RawReading, ShownClasses};
 use puron_core::settings::Settings;
@@ -201,6 +201,7 @@ fn line(identity: &str, word: Option<LineWord>, default: bool) -> ShownLine {
         word,
         value: Some(50.0),
         default,
+        kind: IconKind::CpuTemperature,
     }
 }
 

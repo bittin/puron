@@ -43,6 +43,10 @@ const TEMP: &str = "puron-temperature-symbolic";
 const GPU: &str = "puron-gpu-temperature-symbolic";
 const DRIVE: &str = "drive-harddisk-system-symbolic";
 const VOLT: &str = "puron-voltage-symbolic";
+const CPU: &str = "puron-cpu-temperature-symbolic";
+const MEMORY: &str = "puron-memory-temperature-symbolic";
+const WIFI: &str = "network-wireless-symbolic";
+const WIRED: &str = "network-wired-symbolic";
 
 fn raw(name: &str) -> String {
     std::fs::read_to_string(puron_testkit::fixture("raw", name)).expect("read fixture")
@@ -133,15 +137,21 @@ type Sim = Simulator<'static, (), Theme, cosmic::Renderer>;
 /// with the ID `root`, `BUTTON` px across the panel, in a window `LONG` px
 /// along it.
 fn simulate(plan: &Plan) -> Sim {
+    simulate_along(plan, LONG)
+}
+
+/// As `simulate`, in a window `long` px along the panel, for a plan with
+/// more items than `LONG` px holds.
+fn simulate_along(plan: &Plan, long: f32) -> Sim {
     let content = container(panel::view::<()>(plan)).id(Id::new("root"));
     let (button, window) = match plan.orientation {
         Orientation::Horizontal => (
             content.height(Length::Fixed(BUTTON)),
-            Size::new(LONG, BUTTON),
+            Size::new(long, BUTTON),
         ),
         Orientation::Vertical => (
             content.width(Length::Fixed(BUTTON)),
-            Size::new(BUTTON, LONG),
+            Size::new(BUTTON, long),
         ),
     };
     Simulator::with_size(Default::default(), window, button)
@@ -220,7 +230,11 @@ fn snapshot(sim: &mut Sim, test: &str) -> (Pixels, [u8; 3], [u8; 3]) {
     let mut rgba = vec![0; reader.output_buffer_size()];
     let info = reader.next_frame(&mut rgba).expect("png frame");
     assert_eq!(info.color_type, png::ColorType::Rgba);
-    let _ = std::fs::remove_dir_all(&dir);
+    // A run with PURON_KEEP_SNAPSHOTS set keeps the snapshot, so that a
+    // person can look at what the test saw.
+    if std::env::var_os("PURON_KEEP_SNAPSHOTS").is_none() {
+        let _ = std::fs::remove_dir_all(&dir);
+    }
     let px = Pixels {
         width: info.width,
         height: info.height,
@@ -254,7 +268,7 @@ fn c_applet_panel_1() {
                 puron_core::panel::Item::EmptyState => panic!("pin item"),
             })
             .collect();
-        let want: Vec<String> = [TEMP, DRIVE, TEMP, FAN]
+        let want: Vec<String> = [CPU, DRIVE, WIFI, FAN]
             .iter()
             .zip(&texts)
             .enumerate()
@@ -448,7 +462,7 @@ fn c_applet_panel_9() {
     });
 }
 
-/// Copies the project's four icon files into a hicolor tree under `share`
+/// Copies the project's six icon files into a hicolor tree under `share`
 /// and writes a minimal `index.theme` for it, since the system may have
 /// none for hicolor.
 fn icon_tree(share: &Path) {
@@ -464,7 +478,7 @@ fn icon_tree(share: &Path) {
             n += 1;
         }
     }
-    assert_eq!(n, 4, "Puron's four icon files");
+    assert_eq!(n, 6, "Puron's six icon files");
     std::fs::write(
         share.join("icons/hicolor/index.theme"),
         "[Icon Theme]\nName=hicolor\nComment=Puron test\nDirectories=scalable/status\n\n\
@@ -473,65 +487,83 @@ fn icon_tree(share: &Path) {
     .expect("index.theme");
 }
 
+/// Runs test `test` again in a child process whose `XDG_DATA_DIRS` puts a
+/// hicolor tree of the project's icon files before the system's, so that
+/// the icons are found by name as after an install. Returns true in the
+/// parent, once the child has passed, and false in the child, which then
+/// runs the body of the test.
+fn in_icon_child(test: &str) -> bool {
+    if std::env::var_os(CHILD).is_some() {
+        return false;
+    }
+    let dir = scratch(&format!("{test}-share"));
+    icon_tree(&dir);
+    let out = puron_testkit::rerun_self(test)
+        .env("XDG_DATA_DIRS", format!("{}:/usr/share", dir.display()))
+        .env(CHILD, "1")
+        .output()
+        .expect("run child");
+    let _ = std::fs::remove_dir_all(&dir);
+    assert!(
+        out.status.success(),
+        "child: {}\n{}{}",
+        out.status,
+        String::from_utf8_lossy(&out.stdout),
+        String::from_utf8_lossy(&out.stderr)
+    );
+    true
+}
+
+/// Checks that icon `name`, drawn in rectangle `r` of snapshot `px`, is
+/// symbolic: every pixel that is not the background `bg` is the
+/// foreground `fg` or a blend of the two, and at least one pixel is the
+/// foreground. A full-color icon fails the first check, and an icon that
+/// the themes do not have, which leaves its square empty, the second.
+fn assert_symbolic(px: &Pixels, r: &Rectangle, bg: [u8; 3], fg: [u8; 3], name: &str) {
+    let within = |a: u8, b: f32| (f32::from(a) - b).abs() <= 2.0;
+    let mut at_fg = 0;
+    for p in px.inside(r) {
+        if p == bg {
+            continue;
+        }
+        // How far the pixel lies from the background towards the
+        // foreground, as t in [0, 1]: its projection onto the line
+        // between the two colours. The pixel must then be within 2
+        // of that blend in each channel.
+        let d: Vec<f32> = (0..3)
+            .map(|c| f32::from(fg[c]) - f32::from(bg[c]))
+            .collect();
+        let q: Vec<f32> = (0..3).map(|c| f32::from(p[c]) - f32::from(bg[c])).collect();
+        let dd: f32 = d.iter().map(|x| x * x).sum();
+        let t = ((0..3).map(|c| d[c] * q[c]).sum::<f32>() / dd).clamp(0.0, 1.0);
+        let ok = (0..3).all(|c| within(p[c], f32::from(bg[c]) + t * d[c]));
+        assert!(
+            ok,
+            "icon {name}: pixel {p:?} off the segment {bg:?}..{fg:?}"
+        );
+        if (0..3).all(|c| within(p[c], f32::from(fg[c]))) {
+            at_fg += 1;
+        }
+    }
+    assert!(at_fg > 0, "icon {name}: no pixel at the foreground {fg:?}");
+}
+
 #[test]
 fn c_applet_panel_11() {
     puron_testkit::limit("C-applet.panel-11", LIMIT, || {
-        if std::env::var_os(CHILD).is_none() {
-            let dir = scratch("c_applet_panel_11-share");
-            icon_tree(&dir);
-            let out = puron_testkit::rerun_self("c_applet_panel_11")
-                .env("XDG_DATA_DIRS", format!("{}:/usr/share", dir.display()))
-                .env(CHILD, "1")
-                .output()
-                .expect("run child");
-            let _ = std::fs::remove_dir_all(&dir);
-            assert!(
-                out.status.success(),
-                "child: {}\n{}{}",
-                out.status,
-                String::from_utf8_lossy(&out.stdout),
-                String::from_utf8_lossy(&out.stderr)
-            );
+        if in_icon_child("c_applet_panel_11") {
             return;
         }
         let plan = p1_plan(true, Orientation::Horizontal);
         let mut sim = simulate(&plan);
         let r = rects(&mut sim, &plan);
         let (px, bg, fg) = snapshot(&mut sim, "c_applet_panel_11");
-        let within = |a: u8, b: f32| (f32::from(a) - b).abs() <= 2.0;
         let mut n = 0;
         for (i, e) in plan.elements.iter().enumerate() {
             let Element::Icon { name, .. } = e else {
                 continue;
             };
-            let mut at_fg = 0;
-            for p in px.inside(&r[i]) {
-                if p == bg {
-                    continue;
-                }
-                // How far the pixel lies from the background towards the
-                // foreground, as t in [0, 1]: its projection onto the line
-                // between the two colours. The pixel must then be within 2
-                // of that blend in each channel.
-                let d: Vec<f32> = (0..3)
-                    .map(|c| f32::from(fg[c]) - f32::from(bg[c]))
-                    .collect();
-                let q: Vec<f32> = (0..3).map(|c| f32::from(p[c]) - f32::from(bg[c])).collect();
-                let dd: f32 = d.iter().map(|x| x * x).sum();
-                let t = ((0..3).map(|c| d[c] * q[c]).sum::<f32>() / dd).clamp(0.0, 1.0);
-                let ok = (0..3).all(|c| within(p[c], f32::from(bg[c]) + t * d[c]));
-                assert!(
-                    ok,
-                    "icon {i} {name}: pixel {p:?} off the segment {bg:?}..{fg:?}"
-                );
-                if (0..3).all(|c| within(p[c], f32::from(fg[c]))) {
-                    at_fg += 1;
-                }
-            }
-            assert!(
-                at_fg > 0,
-                "icon {i} {name}: no pixel at the foreground {fg:?}"
-            );
+            assert_symbolic(&px, &r[i], bg, fg, &format!("{i} {name}"));
             n += 1;
         }
         assert_eq!(n, 4);
@@ -1368,5 +1400,278 @@ fn c_applet_panel_32() {
             widths.push(button.width);
         }
         assert!(near(widths[1], widths[0], 0.5), "button widths {widths:?}");
+    });
+}
+
+/// A set of icons.json, whose readings each stand for one kind of device
+/// and carry a short name, such as `cp` or `w1`.
+fn icons_set(set: &str) -> Vec<RawReading> {
+    puron_testkit::raw_sets("icons.json", |r: &mut RawReading, v| r.value = Some(v))
+        .remove(set)
+        .expect("X-raw-icons set")
+}
+
+/// The pinned list `one-each` of icons.json: one reading of each kind of
+/// device, then a fan, a voltage and a power reading. Each is an
+/// lm-sensors reading, given by its short name and the class word of its
+/// identity.
+const ONE_EACH: [(&str, &str); 10] = [
+    ("temperature", "cp"),
+    ("temperature", "ga"),
+    ("temperature", "dn"),
+    ("temperature", "w1"),
+    ("temperature", "e1"),
+    ("temperature", "m1"),
+    ("temperature", "o1"),
+    ("fan", "fm"),
+    ("voltage", "vw"),
+    ("power", "pa"),
+];
+
+/// The identities of the pinned list `one-each` in `raw`.
+fn one_each(raw: &[RawReading]) -> Vec<String> {
+    ONE_EACH
+        .iter()
+        .map(|(class, name)| {
+            let r = raw
+                .iter()
+                .find(|r| r.name.as_deref() == Some(*name))
+                .unwrap_or_else(|| panic!("reading {name}"));
+            format!("{class}/lm-sensors/{}", r.key)
+        })
+        .collect()
+}
+
+/// The plan of the panel with icons on for the set `kinds` of icons.json
+/// and the pinned list `one-each`, with the item index of each pin, in the
+/// pinned list's order.
+fn one_each_plan() -> (Plan, Vec<usize>) {
+    let raw = icons_set("kinds");
+    let pins = one_each(&raw);
+    let s = settings(true);
+    let shown = menu::shown(&raw, &s);
+    let plan = plan_of(
+        &puron_core::panel::panel(&shown, &pins, &s, &State::default()),
+        Orientation::Horizontal,
+    );
+    // The items follow the popup's order, so a pin's item index is the
+    // number of pins before it in that order.
+    let place = |p: &String| shown.place(p).expect("pinned line");
+    let items = pins
+        .iter()
+        .map(|p| pins.iter().filter(|q| place(q) < place(p)).count())
+        .collect();
+    (plan, items)
+}
+
+/// The name of the icon element of item `item`.
+fn icon_of(plan: &Plan, item: usize) -> &'static str {
+    plan.elements
+        .iter()
+        .find_map(|e| match e {
+            Element::Icon { item: i, name } if *i == item => Some(*name),
+            _ => None,
+        })
+        .unwrap_or_else(|| panic!("no icon for item {item}"))
+}
+
+/// With one pin of each kind, each item's icon is the one of its kind:
+/// the CPU chip, the GPU card, the drive, the Wi-Fi sign, the network
+/// socket, the memory module, the thermometer for the other device, the
+/// fan, and the lightning bolt for both voltage and power.
+#[test]
+fn c_applet_panel_33() {
+    puron_testkit::limit("C-applet.panel-33", LIMIT, || {
+        let (plan, items) = one_each_plan();
+        let got: Vec<&str> = items.iter().map(|&i| icon_of(&plan, i)).collect();
+        assert_eq!(
+            got,
+            [CPU, GPU, DRIVE, WIFI, WIRED, MEMORY, TEMP, FAN, VOLT, VOLT]
+        );
+    });
+}
+
+/// The file of icon `name` as `names.tsv` places it: Puron's own under
+/// data/icons, a COSMIC one in the installed COSMIC theme.
+fn icon_file(name: &str) -> PathBuf {
+    let tsv = std::fs::read_to_string(puron_testkit::fixture("icons", "names.tsv"))
+        .expect("read names.tsv");
+    let line = tsv
+        .lines()
+        .map(|l| l.split('\t').collect::<Vec<_>>())
+        .find(|f| f.len() == 3 && f[2] == name)
+        .unwrap_or_else(|| panic!("{name} not in names.tsv"));
+    match line[0] {
+        "puron" => Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../data/icons/hicolor/scalable/status")
+            .join(format!("{name}.svg")),
+        "cosmic" => Path::new(COSMIC)
+            .join("scalable")
+            .join(line[1])
+            .join(format!("{name}.svg")),
+        other => panic!("source {other} of {name}"),
+    }
+}
+
+/// The installed COSMIC icon theme, where the drive and network icons are.
+const COSMIC: &str = "/usr/share/icons/Cosmic";
+
+/// Fails with a host need when the COSMIC icon theme is not installed, so
+/// that a missing theme is not taken for a missing icon.
+fn need_cosmic_theme() {
+    if !Path::new(COSMIC).is_dir() {
+        println!("HOST NEED COSMIC icon theme at {COSMIC}");
+        panic!("HOST NEED COSMIC icon theme at {COSMIC}");
+    }
+}
+
+/// The seven temperature kinds get seven names, and no two of their
+/// files hold the same bytes, so no two kinds share one drawing.
+#[test]
+fn c_applet_panel_34() {
+    puron_testkit::limit("C-applet.panel-34", LIMIT, || {
+        need_cosmic_theme();
+        use menu::IconKind::*;
+        let kinds = [
+            GeneralTemperature,
+            CpuTemperature,
+            GpuTemperature,
+            DriveTemperature,
+            WifiTemperature,
+            WiredNetworkTemperature,
+            MemoryTemperature,
+        ];
+        let names: Vec<&str> = kinds.iter().map(|&k| panel::icon_name(k)).collect();
+        let distinct: std::collections::BTreeSet<&str> = names.iter().copied().collect();
+        assert_eq!(distinct.len(), 7, "{names:?}");
+        let bytes: Vec<Vec<u8>> = names
+            .iter()
+            .map(|n| {
+                let f = icon_file(n);
+                std::fs::read(&f).unwrap_or_else(|e| panic!("read {}: {e}", f.display()))
+            })
+            .collect();
+        let mut pairs = 0;
+        for a in 0..7 {
+            for b in a + 1..7 {
+                assert_ne!(bytes[a], bytes[b], "{} and {}", names[a], names[b]);
+                pairs += 1;
+            }
+        }
+        assert_eq!(pairs, 21);
+    });
+}
+
+/// The CPU and memory icons are Puron's own files: a 16 by 16 view box,
+/// one fill color, no text and no raster image, and the install step puts
+/// each under the hicolor theme of a temporary root. The Wi-Fi and wired
+/// network icons are the COSMIC theme's, and the theme has both. Each
+/// name is the one that the panel looks up.
+#[test]
+fn c_applet_panel_35() {
+    puron_testkit::limit("C-applet.panel-35", LIMIT, || {
+        need_cosmic_theme();
+        use menu::IconKind::*;
+        assert_eq!(panel::icon_name(CpuTemperature), CPU);
+        assert_eq!(panel::icon_name(MemoryTemperature), MEMORY);
+        assert_eq!(panel::icon_name(WifiTemperature), WIFI);
+        assert_eq!(panel::icon_name(WiredNetworkTemperature), WIRED);
+        let tsv = std::fs::read_to_string(puron_testkit::fixture("icons", "names.tsv"))
+            .expect("read names.tsv");
+        for line in [
+            format!("puron\tstatus\t{CPU}"),
+            format!("puron\tstatus\t{MEMORY}"),
+            format!("cosmic\tdevices\t{WIFI}"),
+            format!("cosmic\tdevices\t{WIRED}"),
+        ] {
+            assert!(tsv.lines().any(|l| l == line), "{line:?} in names.tsv");
+        }
+        let root = scratch("c_applet_panel_35-root");
+        let repo = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+        let out = std::process::Command::new("make")
+            .arg("-s")
+            .arg("-C")
+            .arg(&repo)
+            .arg("install-icons")
+            .arg(format!("DESTDIR={}", root.display()))
+            .arg("PREFIX=/usr")
+            .env_remove("MAKEFLAGS")
+            .output()
+            .expect("run make");
+        assert!(
+            out.status.success(),
+            "make install-icons: {}",
+            String::from_utf8_lossy(&out.stderr)
+        );
+        for name in [CPU, MEMORY] {
+            let f = icon_file(name);
+            let svg =
+                std::fs::read_to_string(&f).unwrap_or_else(|e| panic!("read {}: {e}", f.display()));
+            assert!(svg.contains(r#"viewBox="0 0 16 16""#), "{name}: view box");
+            let fills: std::collections::BTreeSet<&str> = svg
+                .match_indices("fill=\"")
+                .map(|(at, m)| {
+                    let rest = &svg[at + m.len()..];
+                    &rest[..rest.find('"').expect("closing quote")]
+                })
+                .filter(|v| *v != "none")
+                .collect();
+            assert_eq!(fills.len(), 1, "{name}: fill values {fills:?}");
+            assert!(!svg.contains("<text"), "{name}: a text element");
+            assert!(!svg.contains("<image"), "{name}: an image element");
+            let installed = root.join(format!(
+                "usr/share/icons/hicolor/scalable/status/{name}.svg"
+            ));
+            assert!(
+                installed.is_file(),
+                "not installed: {}",
+                installed.display()
+            );
+        }
+        let _ = std::fs::remove_dir_all(&root);
+        for name in [WIFI, WIRED] {
+            let f = Path::new(COSMIC).join(format!("scalable/devices/{name}.svg"));
+            assert!(f.is_file(), "missing {}", f.display());
+        }
+    });
+}
+
+/// On a horizontal panel of size M, with one pin of each kind, the icons
+/// of the CPU, Wi-Fi, wired network and memory pins are each as large as
+/// the icon size that libcosmic gives for M, and each is drawn symbolic:
+/// only the foreground color and its blends with the background, and at
+/// least one pixel of the foreground.
+#[test]
+fn c_applet_panel_36() {
+    puron_testkit::limit("C-applet.panel-36", LIMIT, || {
+        if in_icon_child("c_applet_panel_36") {
+            return;
+        }
+        let (plan, items) = one_each_plan();
+        // Ten items are wider than the usual window, which would leave the
+        // last icons no room at all.
+        let mut sim = simulate_along(&plan, 2.0 * LONG);
+        let r = rects(&mut sim, &plan);
+        let (px, bg, fg) = snapshot(&mut sim, "c_applet_panel_36");
+        let size = m_icon_size();
+        // The places of cp, w1, e1 and m1 in the pinned list `one-each`.
+        for pin in [0, 3, 4, 5] {
+            let (i, name) = plan
+                .elements
+                .iter()
+                .enumerate()
+                .find_map(|(i, e)| match e {
+                    Element::Icon { item, name } if *item == items[pin] => Some((i, *name)),
+                    _ => None,
+                })
+                .unwrap_or_else(|| panic!("no icon for pin {pin}"));
+            assert!(near(r[i].width, size, 0.5), "{name} width {}", r[i].width);
+            assert!(
+                near(r[i].height, size, 0.5),
+                "{name} height {}",
+                r[i].height
+            );
+            assert_symbolic(&px, &r[i], bg, fg, name);
+        }
     });
 }

@@ -36,6 +36,12 @@ To build and install Puron from source instead, see Build below.
 
 - The panel shows the readings that you have checked in the popup,
   each with its value. When none is checked, it shows a single icon.
+- Next to each value, the panel shows an icon, unless you switch panel
+  icons off in the settings. A temperature has the icon of its kind of
+  device: CPU, GPU, drive, Wi-Fi, wired network or memory, and a
+  thermometer for any other device, so that two temperatures can be
+  told apart at a glance. Fans, voltages and power have icons of their
+  own.
 - Click Puron in the panel to open the popup, and click it again to
   close it. The popup lists the readings that Puron has found, in
   sections for temperature, fan, voltage and power; temperatures are

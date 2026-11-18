@@ -55,6 +55,8 @@ pub struct ShownLine {
     /// Whether this is its device's default line, the one that a new
     /// install pins (see `Shown::new_install_pins`).
     pub default: bool,
+    /// The icon that the panel shows for the line (see [`icon_kind`]).
+    pub kind: IconKind,
 }
 
 impl ShownLine {
@@ -179,12 +181,22 @@ pub enum Update {
     InPlace,
 }
 
-/// The icon of a line, by class and, for temperatures, by family.
+/// The icon of a line: for a temperature, the kind of device it measures,
+/// so that two pinned temperatures of different devices can be told apart
+/// on the panel by their icons; for any other reading, its class.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum IconKind {
+    /// A temperature of a device that Puron does not tell apart: a
+    /// chipset, an ACPI zone, a battery, a cooler, an unknown chip.
     GeneralTemperature,
+    /// A temperature of the CPU group: a CPU chip's reading, the board's
+    /// CPU reading, or the group's Maximum line.
+    CpuTemperature,
     GpuTemperature,
     DriveTemperature,
+    WifiTemperature,
+    WiredNetworkTemperature,
+    MemoryTemperature,
     Fan,
     Voltage,
     Power,
@@ -268,6 +280,7 @@ pub fn shown(raw: &[RawReading], settings: &Settings) -> Shown {
             identity,
             word: None,
             value: row.value,
+            kind: class_kind(row.class),
             default: false,
         })
         .collect();
@@ -372,7 +385,9 @@ fn devices(temperatures: Vec<(Row, String)>, raw: &[RawReading]) -> Vec<Device> 
     devices.into_iter().map(|(_, d)| d).collect()
 }
 
-/// The line of a temperature row, given with its identity in `pair`.
+/// The line of a temperature row, given with its identity in `pair`. Its
+/// icon kind is the row's own; the CPU group sets the CPU kind on its
+/// lines afterwards (see `cpu_device`).
 fn line(pair: &(Row, String), name: String, word: Option<LineWord>, default: bool) -> ShownLine {
     let (row, identity) = pair;
     ShownLine {
@@ -383,6 +398,7 @@ fn line(pair: &(Row, String), name: String, word: Option<LineWord>, default: boo
         word,
         value: row.value,
         default,
+        kind: row_kind(row),
     }
 }
 
@@ -390,15 +406,99 @@ fn line(pair: &(Row, String), name: String, word: Option<LineWord>, default: boo
 /// counts (see `summary::highest`). Only a group of two or more readings
 /// has one.
 fn maximum_line(group: &Group, members: &[(Row, String)], default: bool) -> Option<ShownLine> {
+    let kinds: Vec<IconKind> = members
+        .iter()
+        .map(|(row, _)| match group {
+            Group::Cpu => IconKind::CpuTemperature,
+            Group::Device(..) => row_kind(row),
+        })
+        .collect();
     (members.len() >= 2).then(|| ShownLine {
         class: Class::Temperature,
         family: members[0].0.family,
+        kind: maximum_kind(&kinds),
         identity: group.maximum_identity(),
         name: String::new(),
         word: Some(LineWord::Maximum),
         value: summary::highest(members.iter().map(|(row, _)| row.value)),
         default,
     })
+}
+
+/// The icon kind of a Maximum line whose group's temperature lines have
+/// `kinds`: the kind they all share. A group whose lines differ in kind,
+/// or that has no line, gets the general thermometer, since no one device
+/// icon stands for all of it.
+pub fn maximum_kind(kinds: &[IconKind]) -> IconKind {
+    match kinds.split_first() {
+        Some((first, rest)) if rest.iter().all(|k| k == first) => *first,
+        _ => IconKind::GeneralTemperature,
+    }
+}
+
+/// The icon kind of a reading that is not a temperature: its class alone,
+/// whatever its chip, so a fan on a memory module still shows a fan.
+fn class_kind(class: Class) -> IconKind {
+    match class {
+        Class::Temperature => IconKind::GeneralTemperature,
+        Class::Fan => IconKind::Fan,
+        Class::Voltage => IconKind::Voltage,
+        Class::Power => IconKind::Power,
+    }
+}
+
+/// The icon kind of `row` outside the CPU group, which the CPU group's
+/// lines replace with the CPU kind. For a temperature, the first that
+/// holds wins: the GPU and drive families, which `rows` gives from the
+/// chip name or the provider; then the lm-sensors chip names of Wi-Fi
+/// cards, wired network cards and memory modules; else general. So a chip
+/// named both after a drive and a memory module counts as a drive, as it
+/// does for the order of the popup.
+fn row_kind(row: &Row) -> IconKind {
+    match (row.class, row.family, row.provider) {
+        (Class::Temperature, Some(Family::Gpu), _) => IconKind::GpuTemperature,
+        (Class::Temperature, Some(Family::Drive), _) => IconKind::DriveTemperature,
+        // An lm-sensors key is `<chip>/<file>`, and a chip name holds no
+        // `/`, so the key starts with the chip name.
+        (Class::Temperature, _, Provider::LmSensors) => {
+            chip_kind(row.key.split('/').next().unwrap_or_default())
+        }
+        (class, _, _) => class_kind(class),
+    }
+}
+
+/// The device kind of an lm-sensors chip by its prefix, the chip name up
+/// to its first `-` (`iwlwifi_1` for `iwlwifi_1-virtual-0`). The prefixes
+/// are the names that the Linux drivers give their sensors. Each test is
+/// exact and case-sensitive, because a looser test would also catch chips
+/// of other drivers whose names only start or end alike, such as
+/// `ixgbevf`.
+fn chip_kind(chip: &str) -> IconKind {
+    let prefix = chip.split('-').next().unwrap_or(chip);
+    let wifi = prefix == "iwlwifi"
+        || prefix.starts_with("iwlwifi_")
+        || matches!(prefix, "ath10k_hwmon" | "ath11k_hwmon" | "ath12k_hwmon")
+        || is_mediatek_phy(prefix);
+    if wifi {
+        IconKind::WifiTemperature
+    } else if matches!(prefix, "ixgbe" | "i350bb" | "bnxt_en") {
+        IconKind::WiredNetworkTemperature
+    } else if matches!(prefix, "jc42" | "spd5118") {
+        IconKind::MemoryTemperature
+    } else {
+        IconKind::GeneralTemperature
+    }
+}
+
+/// Whether `prefix` is a MediaTek Wi-Fi sensor's name, such as
+/// `mt7921_phy0`: `mt7`, one or more digits, `_phy` and one or more
+/// digits, and nothing after them.
+fn is_mediatek_phy(prefix: &str) -> bool {
+    let digits = |s: &str| !s.is_empty() && s.bytes().all(|b| b.is_ascii_digit());
+    prefix
+        .strip_prefix("mt7")
+        .and_then(|rest| rest.split_once("_phy"))
+        .is_some_and(|(model, phy)| digits(model) && digits(phy))
 }
 
 /// The CPU group. Its lines: the default line, then the other readings of
@@ -441,6 +541,11 @@ fn cpu_device(members: Vec<(Row, String)>, roles: &[(String, CpuRole)]) -> Devic
             )
         })
         .collect();
+    // Every line of the CPU group shows the CPU, whatever its chip: the
+    // board controller's CPU reading belongs to the CPU too.
+    for l in &mut lines {
+        l.kind = IconKind::CpuTemperature;
+    }
     lines.extend(maximum_line(&Group::Cpu, &members, default_at.is_none()));
     Device {
         heading: Heading::Cpu,
@@ -646,14 +751,10 @@ fn item(line: &ShownLine, settings: &Settings) -> Item {
     }
 }
 
-/// The icon kind of a line; the panel uses it.
+/// The icon kind of a line; the panel uses it. A temperature has the kind
+/// of its device, decided when the line is built from what Puron already
+/// knows of the sensor; it does not depend on the value, so it stays the
+/// same from poll to poll.
 pub fn icon_kind(line: &ShownLine) -> IconKind {
-    match (line.class, line.family) {
-        (Class::Temperature, Some(Family::Gpu)) => IconKind::GpuTemperature,
-        (Class::Temperature, Some(Family::Drive)) => IconKind::DriveTemperature,
-        (Class::Temperature, _) => IconKind::GeneralTemperature,
-        (Class::Fan, _) => IconKind::Fan,
-        (Class::Voltage, _) => IconKind::Voltage,
-        (Class::Power, _) => IconKind::Power,
-    }
+    line.kind
 }

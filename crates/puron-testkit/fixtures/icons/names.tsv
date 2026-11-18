@@ -1,6 +1,10 @@
 puron	status	puron-temperature-symbolic
+puron	status	puron-cpu-temperature-symbolic
 puron	status	puron-gpu-temperature-symbolic
 cosmic	devices	drive-harddisk-system-symbolic
+cosmic	devices	network-wireless-symbolic
+cosmic	devices	network-wired-symbolic
+puron	status	puron-memory-temperature-symbolic
 puron	status	puron-fan-symbolic
 puron	status	puron-voltage-symbolic
 cosmic	actions	object-select-symbolic

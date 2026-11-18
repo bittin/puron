@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16">
+  <!-- Puron icon (MIT): a CPU chip seen from above (a frame around a
+       square die, three pins on each side). -->
+  <path fill="#000000" fill-rule="evenodd" d="M3 3h10v10H3zM4.5 4.5v7h7v-7zM6 6h4v4H6zM4.5 0h1v3h-1zM7.5 0h1v3h-1zM10.5 0h1v3h-1zM4.5 13h1v3h-1zM7.5 13h1v3h-1zM10.5 13h1v3h-1zM0 4.5h3v1H0zM0 7.5h3v1H0zM0 10.5h3v1H0zM13 4.5h3v1h-3zM13 7.5h3v1h-3zM13 10.5h3v1h-3z"/>
+</svg>

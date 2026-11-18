@@ -12,12 +12,12 @@ raw	temperature/lm-sensors/example_acpi-isa-0000/temp1	67
 raw	voltage/lm-sensors/BAT0-acpi-0/in0	8.494
 menu	0	section	temperature	-	-	-
 menu	1	device	-	CPU	-	-
-menu	2	row	general	coretemp: Core 0	65°C	0
-menu	2	row	general	coretemp: Core 1	71°C	0
-menu	2	row	general	coretemp: Core 2	64°C	0
-menu	2	row	general	coretemp: Core 3	72°C	0
-menu	2	row	general	coretemp: CPU	73°C	0
-menu	2	maximum	general	Maximum (default)	73°C	1
+menu	2	row	cpu	coretemp: Core 0	65°C	0
+menu	2	row	cpu	coretemp: Core 1	71°C	0
+menu	2	row	cpu	coretemp: Core 2	64°C	0
+menu	2	row	cpu	coretemp: Core 3	72°C	0
+menu	2	row	cpu	coretemp: CPU	73°C	0
+menu	2	maximum	cpu	Maximum (default)	73°C	1
 menu	1	device	-	nvme	-	-
 menu	2	row	drive	Sensor 1 (default)	38°C	1
 menu	2	row	drive	Sensor 2	45°C	0
@@ -26,7 +26,7 @@ menu	2	maximum	drive	Maximum	45°C	0
 menu	1	device	-	CPU temp	-	-
 menu	2	row	general	example_acpi: CPU temp	67°C	0
 menu	1	device	-	WiFi	-	-
-menu	2	row	general	iwlwifi: WiFi	33°C	0
+menu	2	row	wifi	iwlwifi: WiFi	33°C	0
 menu	0	separator	-	-	-	-
 menu	0	section	fan	-	-	-
 menu	2	row	fan	CPU fan	0 rpm	0
@@ -36,5 +36,5 @@ menu	2	row	voltage	in0	+8.49V	0
 menu	0	separator	-	-	-	-
 menu	0	settings	-	-	-	-
 menu	0	homepage	-	-	-	-
-panel	general	73°C
+panel	cpu	73°C
 panel	drive	38°C

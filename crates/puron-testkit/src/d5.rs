@@ -370,8 +370,12 @@ fn text(t: Option<&Text>) -> String {
 fn icon_word(k: IconKind) -> &'static str {
     match k {
         IconKind::GeneralTemperature => "general",
+        IconKind::CpuTemperature => "cpu",
         IconKind::GpuTemperature => "gpu",
         IconKind::DriveTemperature => "drive",
+        IconKind::WifiTemperature => "wifi",
+        IconKind::WiredNetworkTemperature => "wired",
+        IconKind::MemoryTemperature => "memory",
         IconKind::Fan => "fan",
         IconKind::Voltage => "voltage",
         IconKind::Power => "power",

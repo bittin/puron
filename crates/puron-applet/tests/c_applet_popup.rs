@@ -538,7 +538,8 @@ fn c_applet_panel_14() {
         };
         let plan = panel::plan(&items, &place, &s);
         // The panel shows the pins in the popup's order, whatever their
-        // order in the pinned list, each with its line's icon.
+        // order in the pinned list, each with the icon of its line's device:
+        // the CPU chip, the drive, the Wi-Fi sign and the fan.
         let on_panel: Vec<(usize, &str)> = plan
             .elements
             .iter()
@@ -547,7 +548,15 @@ fn c_applet_panel_14() {
                 _ => None,
             })
             .collect();
-        assert_eq!(on_panel, [(0, TEMP), (1, DRIVE), (2, TEMP), (3, FAN)]);
+        assert_eq!(
+            on_panel,
+            [
+                (0, "puron-cpu-temperature-symbolic"),
+                (1, DRIVE),
+                (2, "network-wireless-symbolic"),
+                (3, FAN)
+            ]
+        );
     });
 }
 
@@ -1080,5 +1089,48 @@ fn c_applet_popup_26() {
             widths.push(value.width);
         }
         assert!(widths[2] < widths[1], "value widths {widths:?}");
+    });
+}
+
+/// The popup of the set `kinds` of icons.json, which has temperatures of
+/// every kind of device: the section Temperature keeps the thermometer,
+/// whatever devices its lines measure, and its lines carry no icon; the
+/// device icons show on the panel only. The other sections keep their
+/// class icons.
+#[test]
+fn c_applet_popup_27() {
+    puron_testkit::limit("C-applet.popup-27", LIMIT, || {
+        setup();
+        let raw: Vec<RawReading> =
+            serde_json::from_value(set("icons.json", "kinds")).expect("X-raw-icons rows");
+        let m = lay(&raw, None);
+        let plan = plan_of(&m, &[]);
+        let sections: Vec<(&str, &str)> = plan
+            .entries
+            .iter()
+            .filter_map(|e| match e {
+                Drawn::Section { text, icon } => Some((text.as_str(), *icon)),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(
+            sections,
+            [
+                ("Temperature", TEMP),
+                ("Fan", FAN),
+                ("Voltage", VOLT),
+                ("Power", VOLT),
+            ]
+        );
+        // A line is drawn from its identity, check mark, text and value
+        // alone: the plan gives it no icon. Every line of the layout is
+        // drawn.
+        let lines = plan
+            .entries
+            .iter()
+            .filter(|e| matches!(e, Drawn::Line(_)))
+            .count();
+        assert_eq!(lines, m.identities.len());
+        assert!(lines > 40, "{lines} lines");
     });
 }

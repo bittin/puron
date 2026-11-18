@@ -1,0 +1,568 @@
+{
+  "kinds": [
+    {
+      "provider": "lm-sensors",
+      "position": 0,
+      "kind": "temperature",
+      "chip": "coretemp-isa-0000",
+      "name": "cp",
+      "key": "coretemp-isa-0000/temp1",
+      "value": 40.0,
+      "kernel_label": "Package id 0",
+      "platform": true
+    },
+    {
+      "provider": "lm-sensors",
+      "position": 1,
+      "kind": "temperature",
+      "chip": "coretemp-isa-0000",
+      "name": "cc",
+      "key": "coretemp-isa-0000/temp2",
+      "value": 40.0,
+      "kernel_label": "Core 0",
+      "platform": true
+    },
+    {
+      "provider": "lm-sensors",
+      "position": 2,
+      "kind": "temperature",
+      "chip": "k10temp-pci-00c3",
+      "name": "ck",
+      "key": "k10temp-pci-00c3/temp1",
+      "value": 40.0,
+      "kernel_label": "Tccd1",
+      "platform": false
+    },
+    {
+      "provider": "lm-sensors",
+      "position": 3,
+      "kind": "temperature",
+      "chip": "example_acpi-isa-0000",
+      "name": "cb",
+      "key": "example_acpi-isa-0000/temp1",
+      "value": 40.0,
+      "kernel_label": "CPU temp",
+      "platform": true
+    },
+    {
+      "provider": "lm-sensors",
+      "position": 4,
+      "kind": "temperature",
+      "chip": "example_acpi-isa-0000",
+      "name": "bo",
+      "key": "example_acpi-isa-0000/temp2",
+      "value": 40.0,
+      "kernel_label": "GPU temp",
+      "platform": true
+    },
+    {
+      "provider": "lm-sensors",
+      "position": 5,
+      "kind": "temperature",
+      "chip": "amdgpu-pci-0300",
+      "name": "ga",
+      "key": "amdgpu-pci-0300/temp1",
+      "value": 40.0,
+      "platform": false
+    },
+    {
+      "provider": "NVIDIA",
+      "position": 0,
+      "kind": "temperature",
+      "name": "gn",
+      "key": "0000:01:00.0",
+      "value": 40.0
+    },
+    {
+      "provider": "lm-sensors",
+      "position": 6,
+      "kind": "temperature",
+      "chip": "nvme-pci-0100",
+      "name": "dn",
+      "key": "nvme-pci-0100/temp1",
+      "value": 40.0,
+      "kernel_label": "Composite",
+      "platform": false
+    },
+    {
+      "provider": "lm-sensors",
+      "position": 7,
+      "kind": "temperature",
+      "chip": "drivetemp-scsi-0-0",
+      "name": "dd",
+      "key": "drivetemp-scsi-0-0/temp1",
+      "value": 40.0,
+      "platform": false
+    },
+    {
+      "provider": "udisks2",
+      "position": 0,
+      "kind": "temperature",
+      "name": "du",
+      "key": "/org/freedesktop/UDisks2/drives/du",
+      "value": 40.0
+    },
+    {
+      "provider": "nvme-cli",
+      "position": 0,
+      "kind": "temperature",
+      "name": "dc",
+      "key": "0000:02:00.0/temp1",
+      "value": 40.0
+    },
+    {
+      "provider": "lm-sensors",
+      "position": 8,
+      "kind": "temperature",
+      "chip": "iwlwifi_1-virtual-0",
+      "name": "w1",
+      "key": "iwlwifi_1-virtual-0/temp1",
+      "value": 40.0,
+      "platform": false
+    },
+    {
+      "provider": "lm-sensors",
+      "position": 9,
+      "kind": "temperature",
+      "chip": "iwlwifi-virtual-0",
+      "name": "w2",
+      "key": "iwlwifi-virtual-0/temp1",
+      "value": 40.0,
+      "platform": false
+    },
+    {
+      "provider": "lm-sensors",
+      "position": 10,
+      "kind": "temperature",
+      "chip": "ath10k_hwmon-pci-0400",
+      "name": "w3",
+      "key": "ath10k_hwmon-pci-0400/temp1",
+      "value": 40.0,
+      "platform": false
+    },
+    {
+      "provider": "lm-sensors",
+      "position": 11,
+      "kind": "temperature",
+      "chip": "ath11k_hwmon-pci-0500",
+      "name": "w4",
+      "key": "ath11k_hwmon-pci-0500/temp1",
+      "value": 40.0,
+      "platform": false
+    },
+    {
+      "provider": "lm-sensors",
+      "position": 12,
+      "kind": "temperature",
+      "chip": "ath12k_hwmon-pci-0600",
+      "name": "w5",
+      "key": "ath12k_hwmon-pci-0600/temp1",
+      "value": 40.0,
+      "platform": false
+    },
+    {
+      "provider": "lm-sensors",
+      "position": 13,
+      "kind": "temperature",
+      "chip": "mt7921_phy0-pci-0700",
+      "name": "w6",
+      "key": "mt7921_phy0-pci-0700/temp1",
+      "value": 40.0,
+      "platform": false
+    },
+    {
+      "provider": "lm-sensors",
+      "position": 14,
+      "kind": "temperature",
+      "chip": "mt7996_phy12-pci-0800",
+      "name": "w7",
+      "key": "mt7996_phy12-pci-0800/temp1",
+      "value": 40.0,
+      "platform": false
+    },
+    {
+      "provider": "lm-sensors",
+      "position": 15,
+      "kind": "temperature",
+      "chip": "ixgbe-pci-0900",
+      "name": "e1",
+      "key": "ixgbe-pci-0900/temp1",
+      "value": 40.0,
+      "platform": false
+    },
+    {
+      "provider": "lm-sensors",
+      "position": 16,
+      "kind": "temperature",
+      "chip": "i350bb-pci-0a00",
+      "name": "e2",
+      "key": "i350bb-pci-0a00/temp1",
+      "value": 40.0,
+      "platform": false
+    },
+    {
+      "provider": "lm-sensors",
+      "position": 17,
+      "kind": "temperature",
+      "chip": "bnxt_en-pci-0b00",
+      "name": "e3",
+      "key": "bnxt_en-pci-0b00/temp1",
+      "value": 40.0,
+      "platform": false
+    },
+    {
+      "provider": "lm-sensors",
+      "position": 18,
+      "kind": "temperature",
+      "chip": "jc42-i2c-0-18",
+      "name": "m1",
+      "key": "jc42-i2c-0-18/temp1",
+      "value": 40.0,
+      "platform": false
+    },
+    {
+      "provider": "lm-sensors",
+      "position": 19,
+      "kind": "temperature",
+      "chip": "spd5118-i2c-0-50",
+      "name": "m2",
+      "key": "spd5118-i2c-0-50/temp1",
+      "value": 40.0,
+      "platform": false
+    },
+    {
+      "provider": "lm-sensors",
+      "position": 20,
+      "kind": "temperature",
+      "chip": "acpitz-acpi-0",
+      "name": "o1",
+      "key": "acpitz-acpi-0/temp1",
+      "value": 40.0,
+      "platform": false
+    },
+    {
+      "provider": "lm-sensors",
+      "position": 21,
+      "kind": "temperature",
+      "chip": "nct6775-isa-0290",
+      "name": "o2",
+      "key": "nct6775-isa-0290/temp1",
+      "value": 40.0,
+      "platform": false
+    },
+    {
+      "provider": "lm-sensors",
+      "position": 22,
+      "kind": "temperature",
+      "chip": "pch_cannonlake-virtual-0",
+      "name": "o3",
+      "key": "pch_cannonlake-virtual-0/temp1",
+      "value": 40.0,
+      "platform": false
+    },
+    {
+      "provider": "liquidctl",
+      "position": 0,
+      "name": "o4",
+      "device": "Dev",
+      "item": "Liquid temperature",
+      "unit": "°C",
+      "key": "Dev/Liquid temperature",
+      "value": 40.0
+    },
+    {
+      "provider": "lm-sensors",
+      "position": 23,
+      "kind": "temperature",
+      "chip": "puron-isa-0000",
+      "name": "o5",
+      "key": "puron-isa-0000/temp1",
+      "value": 40.0,
+      "platform": false
+    },
+    {
+      "provider": "lm-sensors",
+      "position": 24,
+      "kind": "temperature",
+      "chip": "iwlwifix-virtual-0",
+      "name": "n1",
+      "key": "iwlwifix-virtual-0/temp1",
+      "value": 40.0,
+      "platform": false
+    },
+    {
+      "provider": "lm-sensors",
+      "position": 25,
+      "kind": "temperature",
+      "chip": "IWLWIFI_1-virtual-0",
+      "name": "n2",
+      "key": "IWLWIFI_1-virtual-0/temp1",
+      "value": 40.0,
+      "platform": false
+    },
+    {
+      "provider": "lm-sensors",
+      "position": 26,
+      "kind": "temperature",
+      "chip": "ath10k-pci-0400",
+      "name": "n3",
+      "key": "ath10k-pci-0400/temp1",
+      "value": 40.0,
+      "platform": false
+    },
+    {
+      "provider": "lm-sensors",
+      "position": 27,
+      "kind": "temperature",
+      "chip": "mt7921-pci-0700",
+      "name": "n4",
+      "key": "mt7921-pci-0700/temp1",
+      "value": 40.0,
+      "platform": false
+    },
+    {
+      "provider": "lm-sensors",
+      "position": 28,
+      "kind": "temperature",
+      "chip": "mt7921_phy0x-pci-0700",
+      "name": "n5",
+      "key": "mt7921_phy0x-pci-0700/temp1",
+      "value": 40.0,
+      "platform": false
+    },
+    {
+      "provider": "lm-sensors",
+      "position": 29,
+      "kind": "temperature",
+      "chip": "mt7921_phy-pci-0700",
+      "name": "n6",
+      "key": "mt7921_phy-pci-0700/temp1",
+      "value": 40.0,
+      "platform": false
+    },
+    {
+      "provider": "lm-sensors",
+      "position": 30,
+      "kind": "temperature",
+      "chip": "ixgbevf-pci-0900",
+      "name": "n7",
+      "key": "ixgbevf-pci-0900/temp1",
+      "value": 40.0,
+      "platform": false
+    },
+    {
+      "provider": "lm-sensors",
+      "position": 31,
+      "kind": "temperature",
+      "chip": "jc42x-i2c-0-18",
+      "name": "n8",
+      "key": "jc42x-i2c-0-18/temp1",
+      "value": 40.0,
+      "platform": false
+    },
+    {
+      "provider": "lm-sensors",
+      "position": 32,
+      "kind": "temperature",
+      "chip": "xspd5118-i2c-0-50",
+      "name": "n9",
+      "key": "xspd5118-i2c-0-50/temp1",
+      "value": 40.0,
+      "platform": false
+    },
+    {
+      "provider": "lm-sensors",
+      "position": 33,
+      "kind": "temperature",
+      "chip": "wifi_iwlwifi_1-virtual-0",
+      "name": "n10",
+      "key": "wifi_iwlwifi_1-virtual-0/temp1",
+      "value": 40.0,
+      "platform": false
+    },
+    {
+      "provider": "lm-sensors",
+      "position": 34,
+      "kind": "temperature",
+      "chip": "jc42-nvme-0",
+      "name": "p1",
+      "key": "jc42-nvme-0/temp1",
+      "value": 40.0,
+      "platform": false
+    },
+    {
+      "provider": "lm-sensors",
+      "position": 35,
+      "kind": "voltage",
+      "chip": "iwlwifi_1-virtual-0",
+      "name": "vw",
+      "key": "iwlwifi_1-virtual-0/in0",
+      "value": 1.0,
+      "platform": false
+    },
+    {
+      "provider": "lm-sensors",
+      "position": 36,
+      "kind": "fan",
+      "chip": "jc42-i2c-0-18",
+      "name": "fm",
+      "key": "jc42-i2c-0-18/fan1",
+      "value": 1000.0,
+      "platform": false
+    },
+    {
+      "provider": "lm-sensors",
+      "position": 37,
+      "kind": "power",
+      "chip": "amdgpu-pci-0300",
+      "name": "pa",
+      "key": "amdgpu-pci-0300/power1",
+      "value": 10.0,
+      "platform": false
+    }
+  ],
+  "max": [
+    {
+      "provider": "lm-sensors",
+      "position": 0,
+      "kind": "temperature",
+      "chip": "coretemp-isa-0000",
+      "name": "coretemp temp1",
+      "key": "coretemp-isa-0000/temp1",
+      "value": 40.0,
+      "kernel_label": "Core 0",
+      "platform": true
+    },
+    {
+      "provider": "lm-sensors",
+      "position": 1,
+      "kind": "temperature",
+      "chip": "coretemp-isa-0000",
+      "name": "coretemp temp2",
+      "key": "coretemp-isa-0000/temp2",
+      "value": 50.0,
+      "kernel_label": "Core 1",
+      "platform": true
+    },
+    {
+      "provider": "lm-sensors",
+      "position": 2,
+      "kind": "temperature",
+      "chip": "amdgpu-pci-0300",
+      "name": "amdgpu temp1",
+      "key": "amdgpu-pci-0300/temp1",
+      "value": 40.0,
+      "platform": false
+    },
+    {
+      "provider": "lm-sensors",
+      "position": 3,
+      "kind": "temperature",
+      "chip": "amdgpu-pci-0300",
+      "name": "amdgpu temp2",
+      "key": "amdgpu-pci-0300/temp2",
+      "value": 50.0,
+      "platform": false
+    },
+    {
+      "provider": "lm-sensors",
+      "position": 4,
+      "kind": "temperature",
+      "chip": "nvme-pci-0100",
+      "name": "nvme temp1",
+      "key": "nvme-pci-0100/temp1",
+      "value": 40.0,
+      "platform": false
+    },
+    {
+      "provider": "lm-sensors",
+      "position": 5,
+      "kind": "temperature",
+      "chip": "nvme-pci-0100",
+      "name": "nvme temp2",
+      "key": "nvme-pci-0100/temp2",
+      "value": 50.0,
+      "platform": false
+    },
+    {
+      "provider": "lm-sensors",
+      "position": 6,
+      "kind": "temperature",
+      "chip": "ath11k_hwmon-pci-0500",
+      "name": "ath11k_hwmon temp1",
+      "key": "ath11k_hwmon-pci-0500/temp1",
+      "value": 40.0,
+      "platform": false
+    },
+    {
+      "provider": "lm-sensors",
+      "position": 7,
+      "kind": "temperature",
+      "chip": "ath11k_hwmon-pci-0500",
+      "name": "ath11k_hwmon temp2",
+      "key": "ath11k_hwmon-pci-0500/temp2",
+      "value": 50.0,
+      "platform": false
+    },
+    {
+      "provider": "lm-sensors",
+      "position": 8,
+      "kind": "temperature",
+      "chip": "ixgbe-pci-0900",
+      "name": "ixgbe temp1",
+      "key": "ixgbe-pci-0900/temp1",
+      "value": 40.0,
+      "platform": false
+    },
+    {
+      "provider": "lm-sensors",
+      "position": 9,
+      "kind": "temperature",
+      "chip": "ixgbe-pci-0900",
+      "name": "ixgbe temp2",
+      "key": "ixgbe-pci-0900/temp2",
+      "value": 50.0,
+      "platform": false
+    },
+    {
+      "provider": "lm-sensors",
+      "position": 10,
+      "kind": "temperature",
+      "chip": "jc42-i2c-0-18",
+      "name": "jc42 temp1",
+      "key": "jc42-i2c-0-18/temp1",
+      "value": 40.0,
+      "platform": false
+    },
+    {
+      "provider": "lm-sensors",
+      "position": 11,
+      "kind": "temperature",
+      "chip": "jc42-i2c-0-18",
+      "name": "jc42 temp2",
+      "key": "jc42-i2c-0-18/temp2",
+      "value": 50.0,
+      "platform": false
+    },
+    {
+      "provider": "lm-sensors",
+      "position": 12,
+      "kind": "temperature",
+      "chip": "acpitz-acpi-0",
+      "name": "acpitz temp1",
+      "key": "acpitz-acpi-0/temp1",
+      "value": 40.0,
+      "platform": false
+    },
+    {
+      "provider": "lm-sensors",
+      "position": 13,
+      "kind": "temperature",
+      "chip": "acpitz-acpi-0",
+      "name": "acpitz temp2",
+      "key": "acpitz-acpi-0/temp2",
+      "value": 50.0,
+      "platform": false
+    }
+  ]
+}

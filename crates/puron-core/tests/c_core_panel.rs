@@ -101,8 +101,12 @@ fn text(value: &Option<Text>) -> String {
 fn kind(k: IconKind) -> &'static str {
     match k {
         IconKind::GeneralTemperature => "general",
+        IconKind::CpuTemperature => "cpu",
         IconKind::GpuTemperature => "gpu",
         IconKind::DriveTemperature => "drive",
+        IconKind::WifiTemperature => "wifi",
+        IconKind::WiredNetworkTemperature => "wired",
+        IconKind::MemoryTemperature => "memory",
         IconKind::Fan => "fan",
         IconKind::Voltage => "voltage",
         IconKind::Power => "power",
@@ -141,10 +145,7 @@ fn c_core_panel_1() {
         assert_eq!(pinned("P1"), ids(&raw, &["CPU fan", "WiFi", "CPU", "SSD"]));
         let s = settings_with(|s| s.temperature_unit = TemperatureUnit::Fahrenheit);
         let p = run(&raw, &pinned("P1"), &s, &State::default());
-        assert_items(
-            &p,
-            &["general 163°F", "drive 100°F", "general 91°F", "fan 0rpm"],
-        );
+        assert_items(&p, &["cpu 163°F", "drive 100°F", "wifi 91°F", "fan 0rpm"]);
     });
 }
 
@@ -229,12 +230,11 @@ fn c_core_panel_5() {
             &raw,
             &["@maximum/lm-sensors/nvme-pci-0100", "WiFi", "@maximum/cpu"],
         );
-        // The items follow popup order, not pinned order, and each Maximum
-        // line has the icon of its device's family.
-        assert_items(
-            &lay(&raw, &pins),
-            &["general 73°C", "drive 45°C", "general 33°C"],
-        );
+        // The items follow popup order, not pinned order, and each item has
+        // the icon of its device: the CPU group's Maximum line the CPU, the
+        // drive's Maximum line the drive, and the Wi-Fi card's reading the
+        // Wi-Fi sign.
+        assert_items(&lay(&raw, &pins), &["cpu 73°C", "drive 45°C", "wifi 33°C"]);
     });
 }
 
@@ -252,11 +252,11 @@ fn c_core_panel_7() {
         assert_eq!(p5, ids(&capture(), &["WiFi", "CPU"]));
         let s = Settings::default();
         let first = run(&snapshot("S1"), &p5, &s, &State::default());
-        assert_items(&first, &["general 73°C", "general 33°C"]);
+        assert_items(&first, &["cpu 73°C", "wifi 33°C"]);
         let second = run(&snapshot("S3"), &p5, &s, &first.state);
-        assert_items(&second, &["general 73°C", "general ⚠"]);
+        assert_items(&second, &["cpu 73°C", "wifi ⚠"]);
         let third = run(&snapshot("S1"), &p5, &s, &second.state);
-        assert_items(&third, &["general 73°C", "general 33°C"]);
+        assert_items(&third, &["cpu 73°C", "wifi 33°C"]);
     });
 }
 
@@ -266,9 +266,9 @@ fn c_core_panel_8() {
         let p5 = pinned("P5");
         let s = Settings::default();
         let first = run(&snapshot("S3"), &p5, &s, &State::default());
-        assert_items(&first, &["general 73°C", "∅ ⚠"]);
+        assert_items(&first, &["cpu 73°C", "∅ ⚠"]);
         let second = run(&snapshot("S1"), &p5, &s, &first.state);
-        assert_items(&second, &["general 73°C", "general 33°C"]);
+        assert_items(&second, &["cpu 73°C", "wifi 33°C"]);
     });
 }
 
@@ -282,7 +282,7 @@ fn c_core_panel_10() {
         let second = run(&snapshot("S3"), &p5, &off, &first.state);
         assert_items(&second, &["73°C", "⚠"]);
         let third = run(&snapshot("S3"), &p5, &on, &second.state);
-        assert_items(&third, &["general 73°C", "∅ ⚠"]);
+        assert_items(&third, &["cpu 73°C", "∅ ⚠"]);
     });
 }
 
@@ -326,7 +326,7 @@ fn c_core_panel_13() {
     puron_testkit::limit("C-core.panel-13", LIMIT, || {
         let raw = capture();
         assert_eq!(pinned("P4"), ids(&raw, &["gone", "CPU"]));
-        assert_items(&lay(&raw, &pinned("P4")), &["general 73°C", "∅ ⚠"]);
+        assert_items(&lay(&raw, &pinned("P4")), &["cpu 73°C", "∅ ⚠"]);
     });
 }
 
@@ -338,12 +338,9 @@ fn c_core_panel_14() {
         let first = run(&raw, &p1, &Settings::default(), &State::default());
         let fan_hidden = settings_with(|s| s.show_rotation_rate = false);
         let second = run(&raw, &p1, &fan_hidden, &first.state);
-        assert_items(&second, &["general 73°C", "drive 38°C", "general 33°C"]);
+        assert_items(&second, &["cpu 73°C", "drive 38°C", "wifi 33°C"]);
         let third = run(&raw, &p1, &Settings::default(), &second.state);
-        assert_items(
-            &third,
-            &["general 73°C", "drive 38°C", "general 33°C", "fan 0rpm"],
-        );
+        assert_items(&third, &["cpu 73°C", "drive 38°C", "wifi 33°C", "fan 0rpm"]);
         let temperature_hidden = settings_with(|s| s.show_temperature = false);
         let fourth = run(&raw, &pinned("P4"), &temperature_hidden, &third.state);
         assert_items(&fourth, &["∅ ⚠"]);
@@ -420,10 +417,10 @@ fn c_core_panel_17() {
         let s = Settings::default();
         let first = run(&s1, &cpu, &s, &State::default());
         let second = run(&s1, &both, &s, &first.state);
-        assert_items(&second, &["general 73°C", "general 33°C"]);
+        assert_items(&second, &["cpu 73°C", "wifi 33°C"]);
         let third = run(&s3, &cpu, &s, &second.state);
         let fourth = run(&s3, &both, &s, &third.state);
-        assert_items(&fourth, &["general 73°C", "∅ ⚠"]);
+        assert_items(&fourth, &["cpu 73°C", "∅ ⚠"]);
     });
 }
 
@@ -852,5 +849,67 @@ fn c_core_panel_24__empty_state() {
         );
         let back = run(&fan_at(0.0), &all_pins(), &s, &empty.state);
         assert_eq!(fan_item(&back).as_deref(), Some("0rpm 8888rpm"));
+    });
+}
+
+/// The pinned list `one-each` of icons.json: one reading of each kind of
+/// device, then a fan, a voltage and a power reading, by short name.
+const ONE_EACH: [&str; 10] = ["cp", "ga", "dn", "w1", "e1", "m1", "o1", "fm", "vw", "pa"];
+
+/// The items as their icon words, with ` ⚠` after a pin that has no line.
+fn icon_words(p: &Panel) -> Vec<String> {
+    p.items
+        .iter()
+        .map(|i| match i {
+            Item::Pin {
+                icon: Icon::Kind(k),
+                value,
+            } => format!("{}{}", kind(*k), if value.is_none() { " ⚠" } else { "" }),
+            other => format!("{other:?}"),
+        })
+        .collect()
+}
+
+/// With one pin of each kind of icons.json, each item has the icon of its
+/// device, not of its family: the CPU, Wi-Fi, wired network and memory
+/// pins get their own kinds although their family is the general one.
+/// When the Wi-Fi and memory readings then disappear, their items show
+/// `⚠` and keep the icons of those kinds, which the icon memory holds.
+#[test]
+fn c_core_panel_25() {
+    puron_testkit::limit("C-core.panel-25", LIMIT, || {
+        let raw = set("icons.json", "kinds");
+        let pins = ids(&raw, &ONE_EACH);
+        let want = [
+            "cpu", "gpu", "drive", "wifi", "wired", "memory", "general", "fan", "voltage", "power",
+        ];
+        let s = Settings::default();
+        let first = run(&raw, &pins, &s, &State::default());
+        // The items follow the popup's order; this puts the expected kinds
+        // of the pins in that order.
+        let shown = menu::shown(&raw, &s);
+        let mut order: Vec<usize> = (0..pins.len()).collect();
+        order.sort_by_key(|&i| shown.place(&pins[i]).expect("pinned line"));
+        let in_order: Vec<String> = order.iter().map(|&i| want[i].to_string()).collect();
+        assert_eq!(icon_words(&first), in_order);
+        for (pin, k) in pins.iter().zip(want) {
+            assert_eq!(
+                first.state.icons.get(pin).map(|k| kind(*k)),
+                Some(k),
+                "{pin}"
+            );
+        }
+        let mut fewer = raw.clone();
+        fewer.retain(|r| !matches!(r.name.as_deref(), Some("w1" | "m1")));
+        assert_eq!(fewer.len(), raw.len() - 2);
+        let second = run(&fewer, &pins, &s, &first.state);
+        // The missing pins come last, in the pinned list's order.
+        let mut want_second: Vec<String> = order
+            .iter()
+            .filter(|&&i| !["w1", "m1"].contains(&ONE_EACH[i]))
+            .map(|&i| want[i].to_string())
+            .collect();
+        want_second.extend(["wifi ⚠".to_string(), "memory ⚠".to_string()]);
+        assert_eq!(icon_words(&second), want_second);
     });
 }

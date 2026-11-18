@@ -122,13 +122,20 @@ impl Place {
 }
 
 /// The themed icon name for an icon kind. This is the only map from kinds
-/// to names; the popup's section headings use it too. Voltage and power
-/// share one icon.
+/// to names; the popup's section headings use it too. Each kind of device
+/// has its own temperature icon, so that two pinned temperatures can be
+/// told apart by the icon alone. The drive, Wi-Fi and wired network icons
+/// are the COSMIC theme's; the others are Puron's own, installed under
+/// hicolor. Voltage and power share one icon.
 pub fn icon_name(kind: IconKind) -> &'static str {
     match kind {
         IconKind::GeneralTemperature => "puron-temperature-symbolic",
+        IconKind::CpuTemperature => "puron-cpu-temperature-symbolic",
         IconKind::GpuTemperature => "puron-gpu-temperature-symbolic",
         IconKind::DriveTemperature => "drive-harddisk-system-symbolic",
+        IconKind::WifiTemperature => "network-wireless-symbolic",
+        IconKind::WiredNetworkTemperature => "network-wired-symbolic",
+        IconKind::MemoryTemperature => "puron-memory-temperature-symbolic",
         IconKind::Fan => "puron-fan-symbolic",
         IconKind::Voltage | IconKind::Power => "puron-voltage-symbolic",
     }

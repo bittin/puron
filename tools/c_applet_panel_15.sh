@@ -3,9 +3,11 @@
 # PREFIX=/opt/puron-c15, which makes a release build in the workspace's
 # target directory, then checks under <tmp> the desktop entry (called D
 # in the messages), the installed applet binary and Puron's four icon
-# files, and that nothing was put in <tmp>/usr. The release build has no time
-# limit; the checks after it run under timeout -k 5 120, as this script
-# run again with --after <tmp>. Exits 0, or 1 naming the first failed
+# files of version 1.5.0, named here one by one (the thermometer, the
+# graphics card, the fan and the lightning bolt; the newer icons have a
+# check of their own), and that nothing was put in <tmp>/usr. The
+# release build has no time limit; the checks after it run under
+# timeout -k 5 120, as this script run again with --after <tmp>. Exits 0, or 1 naming the first failed
 # check (124 at the time limit).
 # Usage: tools/c_applet_panel_15.sh
 cd "$(dirname "$0")/.." || exit 2
@@ -38,9 +40,8 @@ EOF
     n=$(wc -l < "$d")
     [ "$n" = 12 ] || fail "wc -l < D prints $n"
     test -x "$tmp$prefix/bin/puron-applet" || fail "test -x $tmp$prefix/bin/puron-applet"
-    names=$(awk -F '\t' '$1 == "puron" { print $3 }' crates/puron-testkit/fixtures/icons/names.tsv)
-    [ "$(echo "$names" | wc -l)" = 4 ] || fail "not four Puron icon names"
-    for name in $names; do
+    for name in puron-temperature-symbolic puron-gpu-temperature-symbolic \
+        puron-fan-symbolic puron-voltage-symbolic; do
         f=$tmp$prefix/share/icons/hicolor/scalable/status/$name.svg
         test -f "$f" || fail "test -f $f"
     done
