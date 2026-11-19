@@ -8,3 +8,6 @@ puron	status	puron-memory-temperature-symbolic
 puron	status	puron-fan-symbolic
 puron	status	puron-voltage-symbolic
 cosmic	actions	object-select-symbolic
+cosmic	actions	go-previous-symbolic
+cosmic	actions	list-remove-symbolic
+cosmic	actions	list-add-symbolic

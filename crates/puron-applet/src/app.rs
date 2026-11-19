@@ -22,6 +22,9 @@ use puron_engine::diag;
 use puron_engine::engine::{Engine, LmReport, Snapshot};
 use puron_engine::registry;
 
+use crate::about::{self, Package};
+use crate::copy;
+
 /// The calls that `App` makes on the engine. `Engine` implements it; the
 /// tests use a fake.
 pub trait Handle: Send + Sync {
@@ -91,9 +94,23 @@ pub enum Event {
     PinClick(String),
     /// A click on the settings link: start the settings program.
     SettingsLink,
-    /// A click on the homepage link or the no-readings message: open the
-    /// homepage in the browser.
+    /// A click on the no-readings message: open the homepage in the
+    /// browser.
     HomepageLink,
+    /// A click on the entry "About": the popup shows the About page.
+    About,
+    /// A click on "Back" on the About page: the popup shows the
+    /// temperatures again.
+    Back,
+    /// The window loop opens the popup. It always opens on the
+    /// temperatures, even when it was closed on the About page.
+    PopupOpened,
+    /// A click on a link of the About page: open its address in the
+    /// browser.
+    OpenLink(String),
+    /// A click on "Copy details" on the About page: build the summary
+    /// that the window loop puts on the clipboard.
+    CopyDetails,
     /// Shut the engine down and exit. Only the first one counts.
     Stop,
 }
@@ -144,6 +161,17 @@ pub enum Output {
     Launch(PathBuf, Launched),
     /// The process is to exit now; the engine's shutdown has returned.
     Exit,
+    /// The text that "Copy details" puts on the clipboard. The window loop
+    /// writes it there.
+    Copy(String),
+}
+
+/// Which page the popup shows: the temperatures, or the About page in
+/// their place.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Page {
+    Temperatures,
+    About,
 }
 
 /// Where `App` finds the two programs it can start. They are parameters
@@ -245,6 +273,11 @@ pub struct App {
     store_pending: bool,
     /// Set by the first `Event::Stop`; later ones do nothing.
     stopped: bool,
+    /// The popup's page. It lasts only while the popup is open: each
+    /// opening shows the temperatures.
+    page: Page,
+    /// The file that "Copy details" reads the kernel release from.
+    kernel_file: PathBuf,
 }
 
 fn kind_word(k: ProblemKind) -> &'static str {
@@ -279,6 +312,31 @@ impl App {
             pin_phase: PinPhase::Starting,
             store_pending: false,
             stopped: false,
+            page: Page::Temperatures,
+            kernel_file: PathBuf::from(copy::KERNEL_RELEASE_FILE),
+        }
+    }
+
+    /// The same `App` reading the kernel release for "Copy details" from
+    /// `path` instead of the running kernel's file, for tests.
+    pub fn with_kernel_release_file(mut self, path: PathBuf) -> App {
+        self.kernel_file = path;
+        self
+    }
+
+    /// The page that the popup shows.
+    pub fn page(&self) -> Page {
+        self.page
+    }
+
+    /// What the About page is drawn from: this program's version, the
+    /// package kind it was built for, and the state of each source of
+    /// sensors in the latest snapshot.
+    pub fn about_input(&self) -> about::Input {
+        about::Input {
+            version: about::VERSION.to_string(),
+            package: Package::built(),
+            sources: about::sources(self.last.as_ref(), &self.settings),
         }
     }
 
@@ -326,31 +384,14 @@ impl App {
                 let r = launch(&path, &[]);
                 self.launched(path, r, &mut out);
             }
-            Event::HomepageLink => {
-                // Look for xdg-open along the search path. An empty or
-                // unset PATH has no directories, so nothing is found there:
-                // split_paths would give one empty entry, which means the
-                // current directory. When nothing is found, the launch
-                // fails with ENOENT.
-                let path = &self.programs.search_path;
-                let found = (!path.is_empty())
-                    .then(|| std::env::split_paths(path))
-                    .into_iter()
-                    .flatten()
-                    .map(|d| d.join(OPENER))
-                    .find(|p| is_executable(p));
-                match found {
-                    Some(path) => {
-                        let r = launch(&path, &[menu::HOMEPAGE_URL]);
-                        self.launched(path, r, &mut out);
-                    }
-                    None => self.launched(
-                        PathBuf::from(OPENER),
-                        Launched::Failed(libc::ENOENT),
-                        &mut out,
-                    ),
-                }
-            }
+            Event::HomepageLink => self.open_url(menu::HOMEPAGE_URL, &mut out),
+            Event::OpenLink(url) => self.open_url(&url, &mut out),
+            // The page changes only on these three events. A snapshot or a
+            // settings change keeps it, and keeps computing the
+            // temperatures' layout, which "Back" then shows.
+            Event::About => self.page = Page::About,
+            Event::Back | Event::PopupOpened => self.page = Page::Temperatures,
+            Event::CopyDetails => out.push(Output::Copy(self.copy_details())),
             Event::Stop => {
                 if !self.stopped {
                     self.stopped = true;
@@ -361,6 +402,36 @@ impl App {
             }
         }
         out
+    }
+
+    /// Starts the browser opener with `url`. It looks for xdg-open along
+    /// the search path. An empty or unset PATH has no directories, so
+    /// nothing is found there: split_paths would give one empty entry,
+    /// which means the current directory. When nothing is found, the
+    /// launch fails with ENOENT.
+    fn open_url(&self, url: &str, out: &mut Vec<Output>) {
+        let path = &self.programs.search_path;
+        let found = (!path.is_empty())
+            .then(|| std::env::split_paths(path))
+            .into_iter()
+            .flatten()
+            .map(|d| d.join(OPENER))
+            .find(|p| is_executable(p));
+        match found {
+            Some(path) => {
+                let r = launch(&path, &[url]);
+                self.launched(path, r, out);
+            }
+            None => self.launched(PathBuf::from(OPENER), Launched::Failed(libc::ENOENT), out),
+        }
+    }
+
+    /// The text of "Copy details": the version, the package kind, the
+    /// kernel release read now, and the state of each source of sensors.
+    fn copy_details(&self) -> String {
+        let input = self.about_input();
+        let kernel = copy::kernel_release(&self.kernel_file);
+        copy::text(&input.version, input.package, &kernel, &input.sources)
     }
 
     /// Records `e` in `out` and logs it. `diag::event` drops it while

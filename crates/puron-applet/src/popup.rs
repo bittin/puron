@@ -87,10 +87,12 @@ pub enum Drawn {
     Line(Line),
     Separator,
     /// The message shown when there are no readings, which tells the user
-    /// what to do. A click on it opens the homepage, like the link.
+    /// what to do. A click on it opens the homepage.
     Message {
         text: String,
     },
+    /// The entry "About", which shows the About page in the popup. It keeps
+    /// the name of the homepage link that it was until version 1.6.
     HomepageLink {
         text: String,
     },
@@ -118,6 +120,14 @@ pub enum Event {
     HomepageLink,
     /// Start the settings program.
     SettingsLink,
+    /// Show the About page in place of the temperatures.
+    About,
+    /// Show the temperatures again, from the About page.
+    Back,
+    /// Open this address of the About page in the browser.
+    OpenLink(String),
+    /// Copy the About page's summary to the clipboard.
+    CopyDetails,
 }
 
 /// The answer to a click: the event to send, if any, and whether the
@@ -143,8 +153,8 @@ pub enum Clicked {
 /// The answer to a widget's click, given `plan`, the popup's plan at the
 /// time of the click. A line that `plan` still shows is sent as
 /// `Event::PinClick` and the popup stays open; a line that `plan` no
-/// longer shows sends nothing. The message and the links answer as in
-/// `click`.
+/// longer shows sends nothing. The message, the entry "About" and the
+/// settings link answer as in `click`.
 pub fn clicked(plan: &Plan, clicked: Clicked) -> Reply {
     let (event, close) = match clicked {
         Clicked::Line(id) => {
@@ -154,21 +164,26 @@ pub fn clicked(plan: &Plan, clicked: Clicked) -> Reply {
                 .any(|e| matches!(e, Drawn::Line(l) if l.identity == id));
             (shown.then_some(Event::PinClick(id)), false)
         }
-        Clicked::Message | Clicked::HomepageLink => (Some(Event::HomepageLink), true),
+        Clicked::Message => (Some(Event::HomepageLink), true),
+        Clicked::HomepageLink => (Some(Event::About), false),
         Clicked::SettingsLink => (Some(Event::SettingsLink), true),
     };
     Reply { event, close }
 }
 
 /// The answer to a click on a drawn entry. A line sends `Event::PinClick`
-/// and leaves the popup open. The message and the homepage link send
-/// `Event::HomepageLink`, the settings link sends `Event::SettingsLink`,
-/// and these three close the popup. Headings and separators do nothing.
+/// and leaves the popup open. The entry "About" sends `Event::About` and
+/// leaves it open too, because the About page shows in the same popup.
+/// The message sends `Event::HomepageLink` and the settings link
+/// `Event::SettingsLink`; these two close the popup, because the user
+/// turns to the browser or the settings window. Headings and separators
+/// do nothing.
 pub fn click(entry: &Drawn) -> Reply {
     let (event, close) = match entry {
         Drawn::Line(l) => (Some(Event::PinClick(l.identity.clone())), false),
         Drawn::Section { .. } | Drawn::Device { .. } | Drawn::Separator => (None, false),
-        Drawn::Message { .. } | Drawn::HomepageLink { .. } => (Some(Event::HomepageLink), true),
+        Drawn::Message { .. } => (Some(Event::HomepageLink), true),
+        Drawn::HomepageLink { .. } => (Some(Event::About), false),
         Drawn::SettingsLink { .. } => (Some(Event::SettingsLink), true),
     };
     Reply { event, close }

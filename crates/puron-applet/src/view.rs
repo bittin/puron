@@ -8,18 +8,23 @@ use puron_core::menu::Menu;
 use puron_core::panel::Panel;
 use puron_core::settings::Settings;
 
-use crate::app::App;
+use crate::about;
+use crate::app::{App, Page};
 use crate::panel::{self, Place};
 use crate::popup;
 
 /// A copy of the drawn parts of `App`. `menu` is `None` until the first
-/// layout.
+/// layout. `about` holds the About page's plan while `page` is the About
+/// page, and is `None` otherwise; `menu` keeps following the snapshots
+/// meanwhile, so that "Back" shows the latest temperatures.
 #[derive(Clone, Debug)]
 pub struct View {
     pub menu: Option<Menu>,
     pub panel: Panel,
     pub pinned: Vec<String>,
     pub settings: Settings,
+    pub page: Page,
+    pub about: Option<about::Plan>,
 }
 
 impl View {
@@ -36,6 +41,8 @@ impl View {
             },
             pinned: Vec::new(),
             settings: Settings::default(),
+            page: Page::Temperatures,
+            about: None,
         }
     }
 
@@ -46,6 +53,8 @@ impl View {
             panel: app.panel().clone(),
             pinned: app.pinned().to_vec(),
             settings: app.settings().clone(),
+            page: app.page(),
+            about: (app.page() == Page::About).then(|| about::plan(&app.about_input())),
         }
     }
 

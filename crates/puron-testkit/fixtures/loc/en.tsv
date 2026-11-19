@@ -47,3 +47,24 @@ tip-lm-sensors	Read sensors from lm-sensors
 tip-liquidctl	Read sensors from liquidctl (requires v1.7.0 or later)
 tip-lm-sensors-drives	Read drive temperatures from lm-sensors
 notice-store-failed	Settings could not be saved
+about-back	Back
+about-version	Version
+about-summary	Monitor hardware sensors
+about-package	Package
+package-deb	Debian package
+package-source	Built from source
+about-license	License
+license-source	Source code
+license-program	Applet program as distributed
+about-copyright	Copyright
+about-sources	Sensor sources
+source-available	available
+source-unavailable	not available
+source-off	off
+source-flatpak	not available in the Flatpak
+about-links	Links
+link-about-homepage	Homepage
+link-about-source	Source code
+link-about-issues	Report a problem
+link-about-notices	Third-party notices
+about-copy	Copy details

@@ -20,33 +20,47 @@ use cosmic::iced::platform_specific::shell::commands::popup::{destroy_popup, get
 use cosmic::iced::window::Id;
 use cosmic::iced::Subscription;
 use cosmic::Element;
-use puron_applet::app::{self, App, Event, Output, Programs, Source};
+use puron_applet::app::{self, App, Event, Output, Page, Programs, Source};
 use puron_applet::view::View;
-use puron_applet::{panel, popup};
+use puron_applet::{about, panel, popup};
 use puron_config::Config;
 use puron_engine::clock::SystemClock;
 use puron_engine::engine::Engine;
 
 /// The libcosmic application's messages: a new view from the event loop,
-/// a press on the panel button, a click in the popup, and the popup
-/// window closed by the compositor.
+/// a press on the panel button, a click in the popup's temperatures or on
+/// its About page, the popup window closed by the compositor, and a text
+/// from the event loop to put on the clipboard.
 #[derive(Clone, Debug)]
 enum Msg {
     View(Box<View>),
     Toggle,
     Clicked(popup::Clicked),
     PopupClosed(Id),
+    AboutClicked(about::Clicked),
+    Copy(String),
 }
 
-/// The receiving end of the channel that carries each `View` from the
-/// event loop. `main` stores it before the toolkit starts; `views` takes
-/// it on the subscription's first run, and any later run gets a stream
-/// that never yields.
-static VIEWS: Mutex<Option<UnboundedReceiver<View>>> = Mutex::new(None);
+/// What the event loop sends to the toolkit: a new view after each
+/// event, and the text of "Copy details" for the clipboard.
+enum FromLoop {
+    View(Box<View>),
+    Copy(String),
+}
+
+/// The receiving end of the channel from the event loop. `main` stores
+/// it before the toolkit starts; `views` takes it on the subscription's
+/// first run, and any later run gets a stream that never yields.
+static VIEWS: Mutex<Option<UnboundedReceiver<FromLoop>>> = Mutex::new(None);
 
 fn views() -> BoxStream<'static, Msg> {
     match VIEWS.lock().unwrap().take() {
-        Some(rx) => rx.map(|v| Msg::View(Box::new(v))).boxed(),
+        Some(rx) => rx
+            .map(|m| match m {
+                FromLoop::View(v) => Msg::View(v),
+                FromLoop::Copy(t) => Msg::Copy(t),
+            })
+            .boxed(),
         None => stream::pending().boxed(),
     }
 }
@@ -71,6 +85,10 @@ impl Applet {
             popup::Event::PinClick(id) => Event::PinClick(id),
             popup::Event::HomepageLink => Event::HomepageLink,
             popup::Event::SettingsLink => Event::SettingsLink,
+            popup::Event::About => Event::About,
+            popup::Event::Back => Event::Back,
+            popup::Event::OpenLink(url) => Event::OpenLink(url),
+            popup::Event::CopyDetails => Event::CopyDetails,
         };
         let _ = self.tx.send((Source::Ui, event));
     }
@@ -130,6 +148,13 @@ impl cosmic::Application for Applet {
                 let Some(main) = self.core.main_window_id() else {
                     return Task::none();
                 };
+                // The popup always opens on the temperatures. The view is
+                // switched here too, so that the first drawing does not
+                // show the About page before the event loop's new view
+                // arrives.
+                let _ = self.tx.send((Source::Ui, Event::PopupOpened));
+                self.view.page = Page::Temperatures;
+                self.view.about = None;
                 let id = Id::unique();
                 self.popup_id = Some(id);
                 let mut settings = self
@@ -157,6 +182,21 @@ impl cosmic::Application for Applet {
                     self.popup_id = None;
                 }
             }
+            Msg::AboutClicked(clicked) => {
+                let Some(plan) = self.view.about.as_ref() else {
+                    return Task::none();
+                };
+                let reply = about::clicked(plan, clicked);
+                if let Some(e) = reply.event {
+                    self.send(e);
+                }
+                if reply.close {
+                    return self.close();
+                }
+            }
+            // A clipboard that cannot be written leaves nothing to show:
+            // the page stays as it is.
+            Msg::Copy(text) => return cosmic::iced::clipboard::write(text),
         }
         Task::none()
     }
@@ -172,7 +212,12 @@ impl cosmic::Application for Applet {
     fn view_window(&self, id: Id) -> Element<'_, Msg> {
         match (self.popup_id == Some(id), self.popup_plan()) {
             (true, Some(plan)) => {
-                let content = popup::view(&plan).map(Msg::Clicked);
+                // The About page takes the width that the temperatures
+                // have, in the same surface.
+                let content = match (self.view.page, &self.view.about) {
+                    (Page::About, Some(about)) => about::view(about).map(Msg::AboutClicked),
+                    _ => popup::view(&plan).map(Msg::Clicked),
+                };
                 let width = self.view.popup_width(&panel::Place::of(&self.core.applet));
                 self.core
                     .applet
@@ -201,8 +246,13 @@ fn main() {
     let state = App::new(engine, config, Programs::production());
     let loop_tx = tx.clone();
     let event_loop = std::thread::spawn(move || {
-        app::run(state, loop_tx, rx, move |_, a: &App, _: &[Output]| {
-            let _ = vtx.unbounded_send(View::of(a));
+        app::run(state, loop_tx, rx, move |_, a: &App, out: &[Output]| {
+            for o in out {
+                if let Output::Copy(text) = o {
+                    let _ = vtx.unbounded_send(FromLoop::Copy(text.clone()));
+                }
+            }
+            let _ = vtx.unbounded_send(FromLoop::View(Box::new(View::of(a))));
         })
     });
 

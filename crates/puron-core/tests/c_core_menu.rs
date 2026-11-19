@@ -392,19 +392,18 @@ fn c_core_menu_13() {
     puron_testkit::limit("C-core.menu-13", LIMIT, || {
         let url = "https://elalonde.dev/projects/puron/";
         assert_eq!(menu::HOMEPAGE_URL, url);
-        let mut urls = Vec::new();
-        for set in ["F", "A"] {
-            for e in lay(&menu_set(set)).entries {
-                match e {
-                    Entry::Message { url, .. } | Entry::HomepageLink { url } => urls.push(url),
-                    _ => {}
-                }
-            }
-        }
-        // Set F has no lines, so its layout has the message and the
-        // homepage link; set A has only the homepage link. All three open
-        // the homepage.
-        assert_eq!(urls, [url, url, url]);
+        // Set F has no lines, so its layout has the message, which opens
+        // the homepage. The entry "About" opens no address: it shows the
+        // About page, whose own link to the homepage uses the constant.
+        let urls: Vec<&str> = lay(&menu_set("F"))
+            .entries
+            .into_iter()
+            .filter_map(|e| match e {
+                Entry::Message { url, .. } => Some(url),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(urls, [url]);
     });
 }
 

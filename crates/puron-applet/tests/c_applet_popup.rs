@@ -451,11 +451,17 @@ fn c_applet_popup_12() {
                 text: i18n::text("link-homepage")
             }
         );
+        // The entry "About" shows the About page in the same popup, which
+        // stays open; it opens no browser.
+        let about = Reply {
+            event: Some(Event::About),
+            close: false,
+        };
+        assert_eq!(popup::click(&plan.entries[w]), about);
         let homepage = Reply {
             event: Some(Event::HomepageLink),
             close: true,
         };
-        assert_eq!(popup::click(&plan.entries[w]), homepage);
         // With no readings at all, the popup shows the message entry, and
         // the two links still end it in the same order.
         let m = lay(&[], None);
@@ -919,6 +925,11 @@ fn c_applet_popup_22() {
             sim.click(selector::id(popup::entry_id(i)))
                 .unwrap_or_else(|e| panic!("click {i}: {e:?}"));
             assert_eq!(sim.into_messages().count(), 0, "entry {i}");
+            assert_eq!(
+                popup::click(&plan.entries[i]),
+                none,
+                "the reply to entry {i}"
+            );
         }
         let gone = Clicked::Line("temperature/lm-sensors/no-such-chip/temp1".into());
         assert_eq!(popup::clicked(&plan, gone), none);
@@ -1066,6 +1077,7 @@ fn c_applet_popup_26() {
                 panel: p,
                 pinned: pins.clone(),
                 settings: s.clone(),
+                ..View::new()
             };
             let plan = view.popup_plan(&place).expect("a layout");
             let i = plan
