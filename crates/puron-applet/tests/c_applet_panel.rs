@@ -47,6 +47,8 @@ const CPU: &str = "puron-cpu-temperature-symbolic";
 const MEMORY: &str = "puron-memory-temperature-symbolic";
 const WIFI: &str = "network-wireless-symbolic";
 const WIRED: &str = "network-wired-symbolic";
+/// The empty-state icon: the symbolic form of Puron's app icon.
+const EMPTY: &str = "io.github.elalonde.Puron-symbolic";
 
 fn raw(name: &str) -> String {
     std::fs::read_to_string(puron_testkit::fixture("raw", name)).expect("read fixture")
@@ -577,7 +579,7 @@ fn c_applet_panel_12() {
         assert!(p2.is_empty());
         for icons in [true, false] {
             let plan = plan_of(&core_panel(&capture(), &p2, icons), Orientation::Horizontal);
-            assert_eq!(kinds(&plan), [format!("0 icon {GPU}")], "icons {icons}");
+            assert_eq!(kinds(&plan), [format!("0 icon {EMPTY}")], "icons {icons}");
         }
     });
 }
@@ -1673,5 +1675,26 @@ fn c_applet_panel_36() {
             );
             assert_symbolic(&px, &r[i], bg, fg, name);
         }
+    });
+}
+
+/// The pin set P2 pins nothing, so the panel shows the empty-state item.
+/// With panel icons on and then off, its plan is one icon element named
+/// after Puron's symbolic app icon, and the icon file of that name is in
+/// the repository, where `make install` takes it from.
+#[test]
+fn c_tests_41() {
+    puron_testkit::limit("C-tests-41", LIMIT, || {
+        let p2 = pinned("P2");
+        assert!(p2.is_empty());
+        for icons in [true, false] {
+            let plan = plan_of(&core_panel(&capture(), &p2, icons), Orientation::Horizontal);
+            assert_eq!(kinds(&plan), [format!("0 icon {EMPTY}")], "icons {icons}");
+            assert_eq!(names(&plan), [EMPTY], "icons {icons}");
+        }
+        let file = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../data/icons/hicolor/symbolic/apps")
+            .join(format!("{EMPTY}.svg"));
+        assert!(file.is_file(), "{} is missing", file.display());
     });
 }

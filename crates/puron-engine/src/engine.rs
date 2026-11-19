@@ -64,13 +64,32 @@ pub enum LmReport {
     Answered,
 }
 
+/// Whether a provider runs and whether it has found anything to read.
+/// The applet's About page shows it for each provider, so that a user can
+/// tell a provider that is switched off from one that runs but finds no
+/// sensor.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ProviderState {
+    /// The provider is switched off, or has never been started.
+    Off,
+    /// Its latest start, or its latest read since then, reported that
+    /// there is nothing to read (for example no library or no device).
+    NotAvailable,
+    /// It is started, and its latest report since that start was
+    /// readings or a failed read, or it has not reported yet. A read past
+    /// its deadline does not change this.
+    Available,
+}
+
 /// What the engine publishes: the current readings of every provider
-/// that is switched on, in provider order, and the state of lm-sensors.
+/// that is switched on, in provider order, the state of lm-sensors, and
+/// the state of every provider, in provider order.
 /// `Scheduler::snapshot` decides which readings a provider contributes.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Snapshot {
     pub readings: Vec<RawReading>,
     pub lm_sensors: LmReport,
+    pub providers: Vec<(Provider, ProviderState)>,
 }
 
 /// The caller's handle to the engine. `start`, `poll_now`,
@@ -281,6 +300,19 @@ struct Prov {
 }
 
 impl Prov {
+    /// The provider's state for the snapshot. `outcome` holds only
+    /// results of the current generation, because `Scheduler::report`
+    /// drops the others and a start clears it.
+    fn state(&self) -> ProviderState {
+        if !self.on {
+            ProviderState::Off
+        } else if matches!(self.outcome, Some(ReadOutcome::Unavailable)) {
+            ProviderState::NotAvailable
+        } else {
+            ProviderState::Available
+        }
+    }
+
     fn reset(&mut self) {
         self.outcome = None;
         self.last = None;
@@ -562,6 +594,9 @@ impl Scheduler {
         Snapshot {
             readings,
             lm_sensors,
+            providers: (self.provs.iter().zip(PROVIDERS))
+                .map(|(p, e)| (e.provider, p.state()))
+                .collect(),
         }
     }
 

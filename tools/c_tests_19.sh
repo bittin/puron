@@ -82,7 +82,7 @@ text_is(one("project_license"), "MIT AND GPL-3.0-only", "project_license")
 dev = one("developer")
 if dev.get("id") != "io.github.elalonde":
     fail(f'developer id is {dev.get("id")!r}, want "io.github.elalonde"')
-children(dev, "developer", [("name", {}, "elalonde")])
+children(dev, "developer", [("name", {}, "Eric Lalonde")])
 
 children(one("description"), "description", [
     ("p", {}, "Puron shows temperatures, fan speeds, voltages and power readings in the panel "

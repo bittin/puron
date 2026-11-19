@@ -440,6 +440,7 @@ mod tests {
             let mut s = Snapshot {
                 readings: vec![reading(Provider::LmSensors)],
                 lm_sensors: LmReport::Answered,
+                providers: vec![],
             };
             assert!(!complete(&s, &flags));
             s.readings.push(reading(Provider::Liquidctl));
@@ -456,6 +457,7 @@ mod tests {
             let empty = Snapshot {
                 readings: Vec::new(),
                 lm_sensors: LmReport::NoneYet,
+                providers: vec![],
             };
             assert!(!complete(&empty, &[flag(Provider::Nvidia, NOT_YET)]));
             assert!(complete(&empty, &[flag(Provider::Nvidia, NO_READINGS)]));

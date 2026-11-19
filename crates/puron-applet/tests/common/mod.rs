@@ -81,6 +81,7 @@ pub fn capture() -> Snapshot {
     Snapshot {
         readings,
         lm_sensors: LmReport::Answered,
+        providers: vec![],
     }
 }
 
@@ -92,6 +93,7 @@ pub fn rebuild(name: &str) -> Snapshot {
     Snapshot {
         readings: sets.remove(name).expect("X-raw-rebuild set"),
         lm_sensors: LmReport::Answered,
+        providers: vec![],
     }
 }
 

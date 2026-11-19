@@ -4,6 +4,7 @@
 
 #[macro_use]
 pub mod i18n;
+pub mod about;
 pub mod app;
 pub mod panel;
 pub mod popup;

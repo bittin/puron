@@ -7,11 +7,11 @@ Comment: The complete corresponding source of the binaries is the release
  license and notices in THIRD-PARTY-NOTICES.txt in this folder.
 
 Files: *
-Copyright: 2026 elalonde
+Copyright: 2026 Eric Lalonde
 License: MIT
 
 Files: usr/bin/puron-applet
-Copyright: 2026 elalonde, and the authors of the Rust crates the binary is
+Copyright: 2026 Eric Lalonde, and the authors of the Rust crates the binary is
  built from (see THIRD-PARTY-NOTICES.txt)
 License: GPL-3.0-only and MPL-2.0 and LGPL-2.1 and NVIDIA-NVML-notice
 Comment: Puron's source files are under MIT terms. This binary links
@@ -23,7 +23,7 @@ Comment: Puron's source files are under MIT terms. This binary links
  NVIDIA's NVML header.
 
 Files: usr/bin/puron-settings
-Copyright: 2026 elalonde, and the authors of the Rust crates the binary is
+Copyright: 2026 Eric Lalonde, and the authors of the Rust crates the binary is
  built from (see THIRD-PARTY-NOTICES.txt)
 License: MIT and MPL-2.0
 Comment: This binary links the libcosmic crates and option-ext (MPL-2.0)
@@ -32,7 +32,7 @@ Comment: This binary links the libcosmic crates and option-ext (MPL-2.0)
  GPL-3.0 crate and neither udisks2 nor the NVML bindings.
 
 License: MIT
- Copyright (c) 2026 elalonde
+ Copyright (c) 2026 Eric Lalonde
  .
  Permission is hereby granted, free of charge, to any person obtaining a copy
  of this software and associated documentation files (the "Software"), to deal

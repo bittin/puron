@@ -28,7 +28,7 @@ use std::time::{Duration, Instant};
 use puron_core::rows::Provider::{self, *};
 use puron_core::settings::Settings;
 use puron_engine::clock::{Clock, SystemClock};
-use puron_engine::engine::{Engine, LmReport, Snapshot};
+use puron_engine::engine::{Engine, LmReport, ProviderState, Snapshot};
 use puron_engine::registry::ReadOutcome;
 use puron_testkit::eng::{
     adapters, r1, r2, CallKind, ConfigureStep, Fake, ReadStep, StartStep, StopStep, VirtualClock,
@@ -75,6 +75,7 @@ impl Run {
             last: Snapshot {
                 readings: vec![],
                 lm_sensors: LmReport::NoneYet,
+                providers: vec![],
             },
         }
     }
@@ -1028,9 +1029,18 @@ fn c_src_registry_4() {
             .starts([StartStep::Unavailable, StartStep::Available])
             .reads([gives(r1(NvmeCli))]);
         r.start(&on(&[NvmeCli], 5), std::slice::from_ref(&nv));
+        // NVMe's unavailable start makes it not available; the other
+        // providers are off.
         let empty = Snapshot {
             readings: vec![],
             lm_sensors: LmReport::NoneYet,
+            providers: vec![
+                (LmSensors, ProviderState::Off),
+                (Liquidctl, ProviderState::Off),
+                (Nvidia, ProviderState::Off),
+                (Udisks2, ProviderState::Off),
+                (NvmeCli, ProviderState::NotAvailable),
+            ],
         };
         for t in [0.0, 5.0, 10.0, 11.0] {
             r.to(t);

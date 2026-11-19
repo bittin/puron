@@ -59,6 +59,7 @@ fn main() {
         last.clone().unwrap_or(Snapshot {
             readings: vec![],
             lm_sensors: puron_engine::engine::LmReport::NoneYet,
+            providers: vec![],
         })
     };
     let r1v = vec![Some(40.0), Some(50.0)];

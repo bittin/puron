@@ -17,7 +17,7 @@ SCRIPT_CHECKS := tools/lint-a.sh tools/c_tests_1.sh tools/c_tests_2.sh tools/c_t
     tools/c_tests_18.sh tools/c_tests_19.sh tools/c_tests_20.sh tools/c_tests_21.sh \
     tools/c_tests_22.sh tools/c_tests_23.sh tools/c_tests_24.sh tools/c_tests_25.sh \
     tools/c_tests_26.sh tools/c_tests_27.sh tools/c_tests_28.sh tools/c_tests_29.sh \
-    tools/c_tests_30.sh
+    tools/c_tests_30.sh tools/c_tests_35.sh tools/c_tests_42.sh
 
 .PHONY: check setup deb check-deb source-archive install install-bin install-icons install-desktop \
     install-appicon install-metainfo install-licenses install-license-texts install-notices
@@ -42,10 +42,23 @@ TARGET_DIR := $(or $(CARGO_TARGET_DIR),target)
 install: install-bin install-icons install-desktop install-appicon install-metainfo
 
 install-bin:
-	cargo build --release --locked -p puron-applet -p puron-settings
+	PURON_PACKAGE=$(PACKAGE) cargo build --release --locked -p puron-applet -p puron-settings
 	install -d $(DESTDIR)$(PREFIX)/bin
 	install -m 755 $(TARGET_DIR)/release/puron-applet $(TARGET_DIR)/release/puron-settings \
 	    $(DESTDIR)$(PREFIX)/bin/
+
+# PACKAGE names the package that the binaries are built for, which the
+# applet shows on its About page: deb for the Debian package
+# (tools/make-deb.sh), flatpak for the Flatpak (the manifest sets it in
+# the environment of the module puron), and unset or empty for a build
+# from source. install-bin hands it to the applet's build as
+# PURON_PACKAGE; cargo rebuilds the applet when the value changes. The
+# value is checked when make reads this file, so a mistyped one stops
+# every target, make -n included, before any command runs.
+PACKAGE ?=
+ifneq ($(filter-out deb flatpak,$(PACKAGE))$(word 2,$(PACKAGE)),)
+$(error PACKAGE is "$(PACKAGE)"; it must be deb, flatpak, or unset or empty)
+endif
 
 install-icons:
 	install -d $(DESTDIR)$(ICON_DIR)

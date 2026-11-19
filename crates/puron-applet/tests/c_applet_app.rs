@@ -429,6 +429,7 @@ fn cpu_snapshot(name: &str) -> puron_engine::engine::Snapshot {
     puron_engine::engine::Snapshot {
         readings: sets.remove(name).expect("X-raw-cpu set"),
         lm_sensors: puron_engine::engine::LmReport::Answered,
+        providers: vec![],
     }
 }
 
@@ -441,6 +442,7 @@ fn drive_snapshot(name: &str) -> puron_engine::engine::Snapshot {
     puron_engine::engine::Snapshot {
         readings: sets.remove(name).expect("X-raw-drives set"),
         lm_sensors: puron_engine::engine::LmReport::Answered,
+        providers: vec![],
     }
 }
 
@@ -1073,6 +1075,7 @@ fn kinds_snapshot(rpm: f64) -> puron_engine::engine::Snapshot {
     puron_engine::engine::Snapshot {
         readings,
         lm_sensors: puron_engine::engine::LmReport::Answered,
+        providers: vec![],
     }
 }
 

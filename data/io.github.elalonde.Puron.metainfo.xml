@@ -6,7 +6,7 @@
   <metadata_license>MIT</metadata_license>
   <project_license>MIT AND GPL-3.0-only</project_license>
   <developer id="io.github.elalonde">
-    <name>elalonde</name>
+    <name>Eric Lalonde</name>
   </developer>
   <description>
     <p>Puron shows temperatures, fan speeds, voltages and power readings in the panel and dock of the COSMIC™ desktop. Pin the readings that matter to the panel; the popup lists every sensor, grouped by device.</p>

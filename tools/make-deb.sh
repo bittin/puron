@@ -1,6 +1,7 @@
 #!/bin/sh
 # Builds the Debian package target/deb/puron_<version>_<arch>.deb with
-# dpkg-deb from a staged make install (PREFIX=/usr). Depends is
+# dpkg-deb from a staged make install (PREFIX=/usr, and PACKAGE=deb so that
+# the applet's About page names the Debian package). Depends is
 # libsensors5 plus what dpkg-shlibdeps finds for the two binaries. The
 # binaries are built with the cargo home and the build directory remapped
 # to /cargo and /build, so they hold neither real path, and then
@@ -19,7 +20,7 @@ rm -rf "$work" && mkdir -p "$stage" || exit 2
 cargo_home=${CARGO_HOME:-$HOME/.cargo}
 RUSTFLAGS="${RUSTFLAGS:+$RUSTFLAGS }--remap-path-prefix=$cargo_home=/cargo --remap-path-prefix=$PWD=/build --remap-path-prefix=$target=/build/target"
 export RUSTFLAGS
-make -s install DESTDIR="$stage" PREFIX=/usr || exit 1
+make -s install DESTDIR="$stage" PREFIX=/usr PACKAGE=deb || exit 1
 strip --strip-unneeded "$stage/usr/bin/puron-applet" "$stage/usr/bin/puron-settings" || exit 1
 install -d "$stage/usr/share/doc/puron" || exit 2
 install -m 644 debian/copyright "$stage/usr/share/doc/puron/copyright" || exit 2

@@ -121,6 +121,12 @@ impl Place {
     }
 }
 
+/// The icon of the empty-state item: the symbolic form of Puron's app
+/// icon, so that a panel with nothing pinned still shows which applet it
+/// is. `make install` installs it under hicolor's `symbolic/apps` in every
+/// package. Until version 1.6 the GPU temperature icon stood there.
+pub const EMPTY_STATE_ICON: &str = "io.github.elalonde.Puron-symbolic";
+
 /// The themed icon name for an icon kind. This is the only map from kinds
 /// to names; the popup's section headings use it too. Each kind of device
 /// has its own temperature icon, so that two pinned temperatures can be
@@ -200,7 +206,7 @@ pub struct Plan {
 }
 
 /// The plan for the items of `panel`. `Item::EmptyState`, shown when no
-/// pin is of a shown class, becomes the GPU temperature icon alone. A pin
+/// pin is of a shown class, becomes `EMPTY_STATE_ICON` alone. A pin
 /// becomes its icon (or an empty slot, or nothing when icons are off)
 /// followed by its value text. The text size comes from `settings` for
 /// the panel type of `place`, at every call, so that a new setting or a
@@ -213,7 +219,7 @@ pub fn plan(panel: &Panel, place: &Place, settings: &Settings) -> Plan {
         match it {
             Item::EmptyState => elements.push(Element::Icon {
                 item,
-                name: icon_name(IconKind::GpuTemperature),
+                name: EMPTY_STATE_ICON,
             }),
             Item::Pin { icon, value } => {
                 match icon {

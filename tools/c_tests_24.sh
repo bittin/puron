@@ -6,7 +6,8 @@
 # missing from the other. Over all modules, the one command that is not
 # make is the libsensors module's install of the lm-sensors license.
 # The Makefile's install target must still name its five parts, and
-# install-licenses must exist.
+# install-licenses must exist. The module puron sets PACKAGE=flatpak in its
+# own build-options.
 # Exits 0, or 1 naming the first failed check.
 # Usage: tools/c_tests_24.sh
 cd "$(dirname "$0")/.." || exit 2
@@ -26,6 +27,12 @@ check '.modules[1].sources as $s |
 check '[.modules[]."build-commands"[] | select(startswith("make ") | not)]
     == ["install -Dm0644 COPYING.LGPL /app/share/licenses/io.github.elalonde.Puron/lm-sensors-COPYING.LGPL"]' \
     "a build command other than make, beside the lm-sensors license line"
+# The module puron alone sets PACKAGE, so that make install builds the
+# applet with the package kind Flatpak; libsensors' make never sees it.
+check '.modules[1]."build-options" == {"env": {"PACKAGE": "flatpak"}}' \
+    "the build-options of the module puron are not exactly PACKAGE flatpak"
+check '.modules[0] | has("build-options") | not' "the module libsensors has build-options"
+check '(."build-options".env // {}) | has("PACKAGE") | not' "the top-level build-options set PACKAGE"
 line=$(grep '^install:' Makefile)
 for t in install-bin install-icons install-desktop install-appicon install-metainfo; do
     printf '%s\n' "$line" | tr ' ' '\n' | grep -qx "$t" || fail "the install target does not name $t"
