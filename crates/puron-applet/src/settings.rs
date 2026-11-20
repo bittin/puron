@@ -15,18 +15,22 @@
 //! made by another program is, so a change is never applied twice and a
 //! store that fails is never applied.
 
+use cosmic::iced::alignment::{Horizontal, Vertical};
+use cosmic::iced::widget::text::Wrapping;
 use cosmic::iced::{Alignment, Length};
 use cosmic::widget::{
-    button, column, container, divider, dropdown, icon, row, scrollable, settings, text,
-    text_input, toggler, tooltip, Id,
+    self, button, column, container, divider, dropdown, icon, row, scrollable, settings, text,
+    text_input, toggler, tooltip, Id, Space,
 };
 use puron_config::Value;
+use puron_core::rows::{drive_chip, Provider};
 use puron_core::settings::{
     Settings, TemperatureUnit, TextSize, POLL_INTERVAL_MAX, POLL_INTERVAL_MIN,
 };
+use puron_engine::engine::Snapshot;
 
-use crate::about::BACK_ICON;
-use crate::look;
+use crate::about::{self, Package, Source, BACK_ICON};
+use crate::look::{self, Role, TextStyle};
 use crate::popup::{menu_button, padded, Event, Reply, PAGE_SIDE_PADDING};
 
 /// The icon name of the number field's − button.
@@ -46,6 +50,36 @@ pub struct Input {
     pub typed: Option<String>,
     /// Whether the latest store of a control's setting failed.
     pub notice: bool,
+    /// The settings that the engine runs with: those of the last load or
+    /// settings watch report. The state line under a provider switch
+    /// follows these and not the shown value, so that it changes when the
+    /// change is applied, and keeps the applied state after a failed
+    /// store.
+    pub applied: Settings,
+    /// The state of each source of sensors, in the order of
+    /// `about::SOURCES`, as the About page shows it.
+    pub sources: [Source; 5],
+    /// The number of lm-sensors readings of drive chips in the latest
+    /// snapshot (see `drive_count`).
+    pub drive_count: usize,
+    /// The kind of package this program was built for.
+    pub package: Package,
+}
+
+/// The number of readings in `last` that lm-sensors read from a drive's
+/// chip, of every class and whether the settings show them or not; 0
+/// before the first snapshot. The state line of the switch "lm-sensors
+/// (drives only)" shows it, because that switch controls those readings
+/// only.
+pub fn drive_count(last: Option<&Snapshot>) -> usize {
+    last.map_or(0, |s| {
+        s.readings
+            .iter()
+            .filter(|r| {
+                r.provider == Provider::LmSensors && r.chip.as_deref().is_some_and(drive_chip)
+            })
+            .count()
+    })
 }
 
 /// The control of an item, with what it currently shows.
@@ -81,12 +115,28 @@ pub struct Item {
     /// The tooltip, if the item has one: the ID of its translation
     /// message and the translated text.
     pub tooltip: Option<(&'static str, String)>,
+    /// The line under the label that shows the state of the item's
+    /// source of sensors. Only the six provider switches, items 11 to 16,
+    /// have one. It is part of the item and answers no click.
+    pub state: Option<StateLine>,
 }
 
-/// A group of items under a heading.
+/// The state of a source of sensors under its switch: the text the About
+/// page shows for that state ("available" with the count of readings),
+/// and its color role.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct StateLine {
+    pub text: String,
+    pub role: Role,
+}
+
+/// A group of items under a heading. The heading is drawn after a small
+/// tile that holds `icon` in the color of `role`.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Section {
     pub heading: String,
+    pub icon: &'static str,
+    pub role: Role,
     pub items: Vec<Item>,
 }
 
@@ -207,6 +257,68 @@ pub const KEYS: [&str; 20] = [
 /// The five sections, as the first and last item number of each. `heading`
 /// gives their headings in the same order.
 const SECTIONS: [(usize, usize); 5] = [(1, 10), (11, 12), (13, 13), (14, 16), (17, 20)];
+
+/// The icon and color role of each section's tile, in the order of
+/// `SECTIONS`: a monitor for the display options, a chip for the generic
+/// providers, a graphics card, a hard disk, and a thermometer for the
+/// shown sensors. Four are icons that Puron already uses for its device
+/// kinds; the monitor comes from the COSMIC icon theme.
+pub const SECTION_LOOKS: [(&str, Role); 5] = [
+    ("video-display-symbolic", Role::Accent),
+    ("puron-cpu-temperature-symbolic", Role::Yellow),
+    ("puron-gpu-temperature-symbolic", Role::Purple),
+    ("drive-harddisk-system-symbolic", Role::Indigo),
+    ("puron-temperature-symbolic", Role::Green),
+];
+
+/// The state line of item `item`, or `None` for an item that is not a
+/// provider switch. The first case that holds decides:
+///
+/// - The switch is off in the applied settings: "off". The drives switch
+///   is off too while lm-sensors itself is off, since lm-sensors then
+///   reads nothing, drives included.
+/// - liquidctl in the Flatpak: "not available in the Flatpak", as on the
+///   About page, because the Flatpak cannot run the host's program.
+/// - The source is not available: "not available".
+/// - The source is available: "available" and its count; for the drives
+///   switch the count of drive readings.
+/// - The source is off although its switch is on: the snapshot was taken
+///   before the source started, or there is none yet. A started source
+///   that has not reported is available with no readings, so the line
+///   says "available · 0".
+fn state_line(item: usize, input: &Input) -> Option<StateLine> {
+    let provider = match item {
+        11 | 14 => Provider::LmSensors,
+        12 => Provider::Liquidctl,
+        13 => Provider::Nvidia,
+        15 => Provider::Udisks2,
+        16 => Provider::NvmeCli,
+        _ => return None,
+    };
+    let mut applied = input.applied.clone();
+    let on = *switch(&mut applied, item).expect("a provider switch")
+        && (item != 14 || input.applied.provider_lm_sensors);
+    let index = about::SOURCES
+        .iter()
+        .position(|(p, _)| *p == provider)
+        .expect("a source of the About page");
+    let line = |text: String, role| StateLine { text, role };
+    // The count is joined to the entry in code, as on the About page, so
+    // the number is never looked up in the catalog.
+    let available = |n: usize| line(format!("{} · {n}", fl!("source-available")), Role::Success);
+    Some(if !on {
+        line(fl!("source-off"), Role::Muted)
+    } else if provider == Provider::Liquidctl && input.package == Package::Flatpak {
+        line(fl!("source-flatpak"), Role::Warning)
+    } else {
+        match input.sources[index] {
+            Source::NotAvailable => line(fl!("source-unavailable"), Role::Muted),
+            Source::Available(_) if item == 14 => available(input.drive_count),
+            Source::Available(n) => available(n),
+            Source::Off => available(0),
+        }
+    })
+}
 
 /// The translated heading of section `section`, counted from 0.
 fn heading(section: usize) -> String {
@@ -549,11 +661,15 @@ pub fn plan(input: &Input) -> Plan {
                     control,
                     key: KEYS[item - 1],
                     tooltip: tooltip_of(item),
+                    state: state_line(item, input),
                 }
             })
             .collect();
+        let (icon, role) = SECTION_LOOKS[s];
         entries.push(Entry::Section(Section {
             heading: heading(s),
+            icon,
+            role,
             items,
         }));
     }
@@ -659,12 +775,85 @@ fn control<'a>(n: usize, c: &'a Kind) -> cosmic::Element<'a, Clicked> {
     container(widget).id(id(format!("control-{n}"))).into()
 }
 
+/// The padding in px of an item inside its section's card: 6 at the top
+/// and bottom and 14 at the sides, tighter than libcosmic's default of 8
+/// and 24, so that the labels line up with the texts in the About page's
+/// cards.
+const ITEM_PADDING: [f32; 2] = [6.0, 14.0];
+/// The side in px of a section's icon tile.
+pub const TILE: f32 = 28.0;
+/// The side in px of the icon in a tile.
+const TILE_ICON: u16 = 16;
+/// The space in px between a tile and its heading text.
+const TILE_GAP: f32 = 10.0;
+/// The side in px of the dot in front of a state line.
+pub const DOT: f32 = 6.0;
+
+/// Section `s`'s heading (counted from 1): its tile, then its text. The
+/// tile is `tile-<s>`, its icon `tile-icon-<s>` and the text
+/// `heading-<s>`.
+fn heading_block<'a>(s: usize, sec: &'a Section) -> cosmic::Element<'a, Clicked> {
+    let role = sec.role;
+    let tile = container(
+        container(look::tinted_icon(sec.icon, TILE_ICON, role)).id(id(format!("tile-icon-{s}"))),
+    )
+    .id(id(format!("tile-{s}")))
+    .width(Length::Fixed(TILE))
+    .height(Length::Fixed(TILE))
+    .align_x(Horizontal::Center)
+    .align_y(Vertical::Center)
+    .class(cosmic::theme::Container::custom(move |t| {
+        look::tile(role, t)
+    }));
+    row::with_children(vec![
+        tile.into(),
+        container(text::heading(sec.heading.as_str()))
+            .id(id(format!("heading-{s}")))
+            .into(),
+    ])
+    .spacing(TILE_GAP)
+    .align_y(Alignment::Center)
+    .into()
+}
+
+/// Item `n`'s label with its state line under it, 2 px apart: a dot and,
+/// 6 px after it, the state text, both in the state's color. The block is
+/// `label-<n>`, the state line `state-<n>` and the dot `dot-<n>`.
+fn label_block<'a>(n: usize, label: &'a str, state: &StateLine) -> cosmic::Element<'a, Clicked> {
+    let role = state.role;
+    let dot = container(
+        Space::new()
+            .width(Length::Fixed(DOT))
+            .height(Length::Fixed(DOT)),
+    )
+    .id(id(format!("dot-{n}")))
+    .class(cosmic::theme::Container::custom(move |t| {
+        look::dot(role, t)
+    }));
+    let line = row::with_children(vec![
+        dot.into(),
+        look::styled(state.text.clone(), TextStyle::Caption, role),
+    ])
+    .spacing(6)
+    .align_y(Alignment::Center);
+    container(
+        column::with_children(vec![
+            text(label).wrapping(Wrapping::Word).into(),
+            container(line).id(id(format!("state-{n}"))).into(),
+        ])
+        .spacing(2),
+    )
+    .id(id(format!("label-{n}")))
+    .into()
+}
+
 /// The page's content, drawn from `plan`: "Back" and the separator, as
 /// wide as the popup like the temperatures' entries, then the notice and
 /// the sections in one column between the two side paddings, all inside
 /// one scroll area so that "Back" scrolls with the page. Each section is
-/// a libcosmic settings section and each item a settings item row; a
-/// label too long for its row wraps.
+/// its heading block above a card that holds its items, each a settings
+/// item row; a label too long for its row wraps. libcosmic's switches
+/// already take the theme's accent color when on.
 pub fn view<'a>(plan: &'a Plan) -> cosmic::Element<'a, Clicked> {
     let mut n = 0;
     let mut s = 0;
@@ -704,8 +893,15 @@ pub fn view<'a>(plan: &'a Plan) -> cosmic::Element<'a, Clicked> {
                 s += 1;
                 let items = sec.items.iter().map(|it| {
                     n += 1;
-                    let row =
-                        settings::item::builder(it.label.as_str()).control(control(n, &it.control));
+                    let row = match &it.state {
+                        None => settings::item::builder(it.label.as_str())
+                            .control(control(n, &it.control)),
+                        Some(state) => settings::item_row(vec![
+                            label_block(n, &it.label, state),
+                            Space::new().width(Length::Fill).into(),
+                            control(n, &it.control),
+                        ]),
+                    };
                     let item: cosmic::Element<'a, Clicked> =
                         container(row).id(id(format!("item-{n}"))).into();
                     match &it.tooltip {
@@ -717,9 +913,19 @@ pub fn view<'a>(plan: &'a Plan) -> cosmic::Element<'a, Clicked> {
                         None => item,
                     }
                 });
-                let section: cosmic::Element<'a, Clicked> = settings::section()
-                    .title(sec.heading.as_str())
-                    .extend(items.collect::<Vec<_>>())
+                let card = items
+                    .fold(
+                        widget::list_column().list_item_padding(ITEM_PADDING),
+                        |col, item| col.add(item),
+                    )
+                    .into_element();
+                // The layout of libcosmic's settings section, the header
+                // 8 px above the card, built here so that the card has an
+                // ID of its own.
+                let section: cosmic::Element<'a, Clicked> = column::with_capacity(2)
+                    .spacing(8)
+                    .push(heading_block(s, sec))
+                    .push(container(card).id(id(format!("card-{s}"))))
                     .into();
                 sections.push(container(section).id(id(format!("section-{s}"))).into());
             }

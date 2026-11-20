@@ -10,7 +10,7 @@
 //! from it.
 
 use cosmic::iced::widget::svg;
-use cosmic::iced::{Color, Length, Padding};
+use cosmic::iced::{Background, Border, Color, Length, Padding};
 use cosmic::widget::{container, icon, text};
 
 use crate::popup::PAGE_SIDE_PADDING;
@@ -146,6 +146,39 @@ pub fn tinted_icon<'a, M: 'a>(name: &'static str, size: u16, role: Role) -> cosm
             }))
             .into(),
         None => i.into(),
+    }
+}
+
+/// The style of a Settings section's icon tile in `theme`: the color of
+/// `role`, faint enough for the icon on it to stand out (alpha 0.18 on a
+/// dark theme, 0.12 on a light one, where the same color looks stronger),
+/// with the theme's small corner radius.
+pub fn tile(role: Role, theme: &cosmic::Theme) -> container::Style {
+    let t = theme.cosmic();
+    let alpha = if t.is_dark { 0.18 } else { 0.12 };
+    container::Style {
+        background: color(role, theme).map(|mut c| {
+            c.a = alpha;
+            Background::Color(c)
+        }),
+        border: Border {
+            radius: t.radius_s().into(),
+            ..Border::default()
+        },
+        ..container::Style::default()
+    }
+}
+
+/// The style of the round dot in front of a state line: a disc in the
+/// color of `role`.
+pub fn dot(role: Role, theme: &cosmic::Theme) -> container::Style {
+    container::Style {
+        background: color(role, theme).map(Background::Color),
+        border: Border {
+            radius: 3.0.into(),
+            ..Border::default()
+        },
+        ..container::Style::default()
     }
 }
 

@@ -359,13 +359,20 @@ impl App {
     }
 
     /// What the Settings page is drawn from: the value each control
-    /// shows, the text being typed into the number field, and whether the
-    /// latest store failed.
+    /// shows, the text being typed into the number field, whether the
+    /// latest store failed, and for the state lines under the provider
+    /// switches the applied settings, the state of each source and the
+    /// number of drive readings in the latest snapshot, and the package
+    /// kind.
     pub fn settings_input(&self) -> settings::Input {
         settings::Input {
             values: self.values.clone(),
             typed: self.typed.clone(),
             notice: self.notice,
+            applied: self.settings.clone(),
+            sources: about::sources(self.last.as_ref(), &self.settings),
+            drive_count: settings::drive_count(self.last.as_ref()),
+            package: Package::built(),
         }
     }
 

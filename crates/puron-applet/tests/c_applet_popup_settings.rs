@@ -22,6 +22,7 @@ use cosmic::widget::{container, Id};
 use cosmic::Theme;
 use iced_test::selector::{Candidate, Selector, Target};
 use iced_test::Simulator;
+use puron_applet::about::{Package, Source};
 use puron_applet::app::{Event, Page};
 use puron_applet::popup::{Event as PopupEvent, Reply};
 use puron_applet::settings::{self, Choice, Clicked, Edit, Entry, Input, Item, Kind, Plan};
@@ -46,11 +47,30 @@ type Sim<'a> = Simulator<'a, Clicked, Theme, cosmic::Renderer>;
 fn plan_of(name: &str, notice: bool) -> Plan {
     puron_applet::start();
     let fx = cfg::build(name);
-    settings::plan(&Input {
-        values: Config::new(&fx.root).load().settings,
+    settings::plan(&input(Config::new(&fx.root).load().settings, notice))
+}
+
+/// The Settings input of the shown and applied settings `values`, with no
+/// typed text, a notice when `notice` is true, the Debian package and the
+/// About page's source set `all`: lm-sensors available with 12 readings,
+/// NVMe with 2, NVIDIA not available, udisks2 with 1, liquidctl not
+/// available, and no drive reading.
+fn input(values: puron_core::settings::Settings, notice: bool) -> Input {
+    Input {
+        applied: values.clone(),
+        values,
         typed: None,
         notice,
-    })
+        sources: [
+            Source::Available(12),
+            Source::Available(2),
+            Source::NotAvailable,
+            Source::Available(1),
+            Source::NotAvailable,
+        ],
+        drive_count: 0,
+        package: Package::Deb,
+    }
 }
 
 /// The plan of the `good` fixture without a notice.
@@ -278,11 +298,7 @@ fn c_applet_popup_32() {
         use puron_applet::i18n;
         i18n::start_with(i18n::test_catalog::eo(), |k| std::env::var_os(k));
         let fx = cfg::build("good");
-        let plan = settings::plan(&Input {
-            values: Config::new(&fx.root).load().settings,
-            typed: None,
-            notice: true,
-        });
+        let plan = settings::plan(&input(Config::new(&fx.root).load().settings, true));
         let en = puron_testkit::loc::english();
         let english = |t: &str| -> bool { en.iter().any(|(_, e)| e == t) };
         let eo = |t: &str| t.strip_prefix("EO ").is_some_and(english);
@@ -629,7 +645,8 @@ fn c_applet_popup_37() {
 }
 
 /// Each item's label and control are centered vertically on the item
-/// row, within one pixel.
+/// row, within one pixel. For the provider switches, items 11 to 16, the
+/// label is the block of the label and the state line under it.
 #[test]
 fn c_applet_popup_38() {
     puron_testkit::limit("C-applet.popup-38", LIMIT, || {
@@ -637,7 +654,11 @@ fn c_applet_popup_38() {
         let mut sim = sim(&plan, WIDE);
         for n in 1..=20 {
             let i = item_rect(&mut sim, n);
-            let l = label(&mut sim, &plan, n);
+            let l = if (11..=16).contains(&n) {
+                rect(&mut sim, &format!("label-{n}"))
+            } else {
+                label(&mut sim, &plan, n)
+            };
             let c = control(&mut sim, n);
             assert!(
                 near(mid_y(l), mid_y(i), 1.0),

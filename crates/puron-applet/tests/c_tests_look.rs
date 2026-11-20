@@ -416,14 +416,20 @@ fn dump_file(name: &str) -> String {
     std::fs::read_to_string(&path).unwrap_or_else(|e| panic!("read {}: {e}", path.display()))
 }
 
-/// The Settings plan of the `good` fixture.
+/// The Settings plan of the `good` fixture, its settings shown and
+/// applied, on the Debian package with the source set `all`.
 fn settings_plan() -> settings::Plan {
     puron_applet::start();
     let fx = cfg::build("good");
+    let values = Config::new(&fx.root).load().settings;
     settings::plan(&settings::Input {
-        values: Config::new(&fx.root).load().settings,
+        applied: values.clone(),
+        values,
         typed: None,
         notice: false,
+        sources: ALL,
+        drive_count: 0,
+        package: Package::Deb,
     })
 }
 

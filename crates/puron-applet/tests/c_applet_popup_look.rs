@@ -21,7 +21,8 @@ use cosmic::applet::{Context, Size as AppletSize};
 use cosmic::iced::{Color, Rectangle, Size};
 use cosmic::widget::{container, Id};
 use cosmic::Theme;
-use iced_test::{selector, Simulator};
+use iced_test::selector::{self, Candidate, Selector};
+use iced_test::Simulator;
 use puron_applet::about::{self, Package, Place, Source};
 use puron_applet::look::{self, Role, ROLES};
 use puron_applet::panel;
@@ -87,15 +88,32 @@ fn about_plan() -> about::Plan {
     })
 }
 
-/// The Settings plan of the `good` fixture, with no typed text and no
-/// notice.
-fn settings_plan() -> settings::Plan {
-    let fx = cfg::build("good");
-    settings::plan(&settings::Input {
-        values: Config::new(&fx.root).load().settings,
+/// The Settings input of `applied`, shown and applied, with no typed text,
+/// no notice, the package kind `package`, the sources `sources` and the
+/// number of drive readings `drives`.
+fn settings_input(
+    applied: Settings,
+    package: Package,
+    sources: [Source; 5],
+    drives: usize,
+) -> settings::Input {
+    settings::Input {
+        values: applied.clone(),
+        applied,
         typed: None,
         notice: false,
-    })
+        sources,
+        drive_count: drives,
+        package,
+    }
+}
+
+/// The Settings plan of the `good` fixture on the Debian package with the
+/// source set `all`.
+fn settings_plan() -> settings::Plan {
+    let fx = cfg::build("good");
+    let values = Config::new(&fx.root).load().settings;
+    settings::plan(&settings_input(values, Package::Deb, ALL, 0))
 }
 
 /// A simulator that draws `content` in a popup `width` px wide, with the
@@ -230,19 +248,377 @@ fn c_applet_popup_44__about() {
     });
 }
 
+/// The left edge of the "Temperature" heading's icon on the temperatures
+/// drawn `width` px wide, relative to the popup's left edge.
+fn temperature_icon_x(width: f32) -> f32 {
+    let plan = readings_plan();
+    let i = temperature_heading(&plan);
+    let mut s = sim(popup::view(&plan), width);
+    let root = rect(&mut s, Id::new("root"));
+    rect(&mut s, popup::element_id(i, "icon")).x - root.x
+}
+
 /// The Settings page drawn at the narrowest and the widest popup: Back's
-/// icon starts 24 px right of the popup's left edge.
+/// icon and each section's icon tile start 24 px right of the popup's
+/// left edge, each tile where the temperatures' "Temperature" icon starts
+/// at the same width, and each section's card reaches from 24 px right of
+/// the popup's left edge to 24 px left of its right edge.
 #[test]
 fn c_applet_popup_44__settings() {
     puron_testkit::limit("C-applet.popup-44", LIMIT, || {
         puron_applet::start();
         let plan = settings_plan();
         for width in [popup::WIDTH, popup::MAX_WIDTH] {
+            let readings = temperature_icon_x(width);
             let mut s = sim(settings::view(&plan), width);
             let root = rect(&mut s, Id::new("root"));
             let back = rect(&mut s, settings::id("back-icon"));
             at_left("Back icon", width, back, root);
+            for n in 1..=5 {
+                let tile = rect(&mut s, settings::id(format!("tile-{n}")));
+                at_left(&format!("tile {n}"), width, tile, root);
+                assert!(
+                    near(tile.x - root.x, readings),
+                    "width {width}: tile {n} at {} against the Temperature icon at {readings}",
+                    tile.x - root.x
+                );
+                let card = rect(&mut s, settings::id(format!("card-{n}")));
+                at_left(&format!("card {n}"), width, card, root);
+                at_right(&format!("card {n}"), width, card, root);
+            }
         }
+    });
+}
+
+/// The Settings plan of the `good` fixture: the five section headings in
+/// order, each with its tile's icon and color role, and each icon name is
+/// a line of the icon list of the test fixtures, so that it is one the
+/// applet is known to find.
+#[test]
+fn c_applet_popup_45() {
+    puron_testkit::limit("C-applet.popup-45", LIMIT, || {
+        puron_applet::start();
+        let plan = settings_plan();
+        let got: Vec<(String, &str, Role)> = plan
+            .sections()
+            .iter()
+            .map(|s| (s.heading.clone(), s.icon, s.role))
+            .collect();
+        let want = [
+            ("Display Options", "video-display-symbolic", Role::Accent),
+            (
+                "Generic Sensor Providers",
+                "puron-cpu-temperature-symbolic",
+                Role::Yellow,
+            ),
+            (
+                "GPU Sensor Providers",
+                "puron-gpu-temperature-symbolic",
+                Role::Purple,
+            ),
+            (
+                "Drive Sensor Providers",
+                "drive-harddisk-system-symbolic",
+                Role::Indigo,
+            ),
+            ("Show Sensors", "puron-temperature-symbolic", Role::Green),
+        ];
+        let want: Vec<(String, &str, Role)> = want
+            .iter()
+            .map(|(h, i, r)| (h.to_string(), *i, *r))
+            .collect();
+        assert_eq!(got, want);
+        let names = std::fs::read_to_string(puron_testkit::fixture("icons", "names.tsv"))
+            .expect("read names.tsv");
+        for (_, icon, _) in &got {
+            assert!(
+                names.lines().any(|l| l.split('\t').nth(2) == Some(icon)),
+                "{icon} is not in names.tsv"
+            );
+        }
+    });
+}
+
+/// The source set `flatpak-off`: as `all`, with liquidctl off.
+const FLATPAK_OFF: [Source; 5] = [
+    Source::Available(12),
+    Source::Available(2),
+    Source::NotAvailable,
+    Source::Available(1),
+    Source::Off,
+];
+
+/// The state line of each item of the Settings plan for `input`, as
+/// `(item, text, role)`, for the items that have one.
+fn lines(input: &settings::Input) -> Vec<(usize, String, Role)> {
+    settings::plan(input)
+        .items()
+        .iter()
+        .enumerate()
+        .filter_map(|(i, it)| it.state.as_ref().map(|s| (i + 1, s.text.clone(), s.role)))
+        .collect()
+}
+
+/// The state line of item `n` for `input`. Every plan must have one line
+/// for each of items 11 to 16 and none for any other item.
+fn line_of(input: &settings::Input, n: usize) -> (String, Role) {
+    let all = lines(input);
+    let items: Vec<usize> = all.iter().map(|l| l.0).collect();
+    assert_eq!(
+        items,
+        (11..=16).collect::<Vec<_>>(),
+        "items with a state line"
+    );
+    let (_, text, role) = all.into_iter().find(|l| l.0 == n).expect("a line");
+    (text, role)
+}
+
+fn want(text: &str, role: Role) -> (String, Role) {
+    (text.to_string(), role)
+}
+
+/// lm-sensors on (as by default) with the source set `all`: its line
+/// reads "available · 12" in green.
+#[test]
+fn c_applet_popup_46__available() {
+    puron_testkit::limit("C-applet.popup-46", LIMIT, || {
+        puron_applet::start();
+        let s = Settings::default();
+        assert!(s.provider_lm_sensors);
+        let input = settings_input(s, Package::Deb, ALL, 0);
+        assert_eq!(line_of(&input, 11), want("available · 12", Role::Success));
+    });
+}
+
+/// Udisks2 off (as by default) with the source set `all`, where udisks2
+/// is available: its line reads "off" in grey, since the line follows
+/// the switch first.
+#[test]
+fn c_applet_popup_46__off() {
+    puron_testkit::limit("C-applet.popup-46", LIMIT, || {
+        puron_applet::start();
+        let s = Settings::default();
+        assert!(!s.provider_udisks2);
+        let input = settings_input(s, Package::Deb, ALL, 0);
+        assert_eq!(line_of(&input, 15), want("off", Role::Muted));
+    });
+}
+
+/// Nvidia on with the source set `all`, where NVIDIA is not available:
+/// its line reads "not available" in grey.
+#[test]
+fn c_applet_popup_46__unavailable() {
+    puron_testkit::limit("C-applet.popup-46", LIMIT, || {
+        puron_applet::start();
+        let s = Settings {
+            provider_nvidia: true,
+            ..Settings::default()
+        };
+        let input = settings_input(s, Package::Deb, ALL, 0);
+        assert_eq!(line_of(&input, 13), want("not available", Role::Muted));
+    });
+}
+
+/// liquidctl in the Flatpak: switched on with `flatpak-on`, its line reads
+/// "not available in the Flatpak" in the warning color with no count;
+/// switched off with `flatpak-off`, "off" in grey; switched on in the
+/// Debian package with `all`, "not available" in grey.
+#[test]
+fn c_applet_popup_46__flatpak() {
+    puron_testkit::limit("C-applet.popup-46", LIMIT, || {
+        puron_applet::start();
+        let on = Settings {
+            provider_liquidctl: true,
+            ..Settings::default()
+        };
+        let off = Settings {
+            provider_liquidctl: false,
+            ..on.clone()
+        };
+        assert_eq!(
+            line_of(&settings_input(on.clone(), Package::Flatpak, ALL, 0), 12),
+            want("not available in the Flatpak", Role::Warning)
+        );
+        assert_eq!(
+            line_of(&settings_input(off, Package::Flatpak, FLATPAK_OFF, 0), 12),
+            want("off", Role::Muted)
+        );
+        assert_eq!(
+            line_of(&settings_input(on, Package::Deb, ALL, 0), 12),
+            want("not available", Role::Muted)
+        );
+    });
+}
+
+/// The drives switch with 3 drive readings and the source set `all`:
+/// with lm-sensors and the drives switch on it reads "available · 3" in
+/// green, the drive count and not lm-sensors' 12; with the drives switch
+/// off, "off"; with lm-sensors off and the drives switch on, "off" too,
+/// since lm-sensors then reads no drive either.
+#[test]
+fn c_applet_popup_46__drives() {
+    puron_testkit::limit("C-applet.popup-46", LIMIT, || {
+        puron_applet::start();
+        let s = Settings {
+            provider_lm_sensors: true,
+            provider_lm_sensors_drives: true,
+            ..Settings::default()
+        };
+        assert_eq!(
+            line_of(&settings_input(s.clone(), Package::Deb, ALL, 3), 14),
+            want("available · 3", Role::Success)
+        );
+        let drives_off = Settings {
+            provider_lm_sensors_drives: false,
+            ..s.clone()
+        };
+        assert_eq!(
+            line_of(&settings_input(drives_off, Package::Deb, ALL, 3), 14),
+            want("off", Role::Muted)
+        );
+        let lm_off = Settings {
+            provider_lm_sensors: false,
+            ..s
+        };
+        assert_eq!(
+            line_of(&settings_input(lm_off, Package::Deb, ALL, 3), 14),
+            want("off", Role::Muted)
+        );
+    });
+}
+
+/// nvme-cli switched on with all five sources off, as in a snapshot taken
+/// before the source started: its line reads "available · 0" in green,
+/// the state of a started source that has not reported yet.
+#[test]
+fn c_applet_popup_46__started() {
+    puron_testkit::limit("C-applet.popup-46", LIMIT, || {
+        puron_applet::start();
+        let s = Settings {
+            provider_nvme: true,
+            ..Settings::default()
+        };
+        let input = settings_input(s, Package::Deb, [Source::Off; 5], 0);
+        assert_eq!(line_of(&input, 16), want("available · 0", Role::Success));
+    });
+}
+
+/// Selects the first text widget whose content is the given text. iced's
+/// own text selector is not used because it also asks text inputs for
+/// their text, which libcosmic's text input does not support at the
+/// revision this workspace pins.
+struct TextIs(String);
+
+impl Selector for TextIs {
+    type Output = Rectangle;
+
+    fn select(&mut self, candidate: Candidate<'_>) -> Option<Rectangle> {
+        match candidate {
+            Candidate::Text {
+                bounds, content, ..
+            } if content == self.0 => Some(bounds),
+            _ => None,
+        }
+    }
+
+    fn description(&self) -> String {
+        format!("text == {:?}", self.0)
+    }
+}
+
+/// The rectangle of the first text that reads `content`.
+fn text_rect<M: Clone>(
+    s: &mut Simulator<'_, M, Theme, cosmic::Renderer>,
+    content: &str,
+) -> Rectangle {
+    s.find(TextIs(content.to_string()))
+        .unwrap_or_else(|e| panic!("text {content}: {e:?}"))
+}
+
+/// Whether `r` lies within `area`, give or take `TOL`.
+fn inside(r: Rectangle, area: Rectangle) -> bool {
+    r.x >= area.x - TOL
+        && r.y >= area.y - TOL
+        && r.x + r.width <= area.x + area.width + TOL
+        && r.y + r.height <= area.y + area.height + TOL
+}
+
+/// The Settings page of the `good` fixture at the widest popup with the
+/// source set `all`. Each section's tile is 28 × 28 px with its 16 × 16
+/// icon centered within 1 px, and the heading text starts 10 px after
+/// the tile. All the items of a section lie inside one card, which starts
+/// where the tile starts and below it; each label starts 14 px inside the
+/// card. Each state line of items 11 to 16 is below its label, with a
+/// 6 × 6 dot.
+#[test]
+fn c_applet_popup_48() {
+    puron_testkit::limit("C-applet.popup-48", LIMIT, || {
+        puron_applet::start();
+        let plan = settings_plan();
+        let mut s = sim(settings::view(&plan), popup::MAX_WIDTH);
+        let mut n = 0;
+        for (k, sec) in plan.sections().iter().enumerate() {
+            let k = k + 1;
+            let tile = rect(&mut s, settings::id(format!("tile-{k}")));
+            let icon = rect(&mut s, settings::id(format!("tile-icon-{k}")));
+            let heading = rect(&mut s, settings::id(format!("heading-{k}")));
+            let card = rect(&mut s, settings::id(format!("card-{k}")));
+            assert!(
+                near(tile.width, 28.0) && near(tile.height, 28.0),
+                "tile {k} {tile:?}"
+            );
+            assert!(
+                near(icon.width, 16.0) && near(icon.height, 16.0),
+                "tile icon {k} {icon:?}"
+            );
+            let (tc, ic) = (tile.center(), icon.center());
+            assert!(
+                (tc.x - ic.x).abs() <= 1.0 && (tc.y - ic.y).abs() <= 1.0,
+                "tile {k}: icon {icon:?} not centered in {tile:?}"
+            );
+            assert!(
+                near(heading.x, tile.x + tile.width + 10.0),
+                "section {k}: heading starts at {} after tile {tile:?}",
+                heading.x
+            );
+            assert!(
+                near(card.x, tile.x),
+                "section {k}: card {card:?} tile {tile:?}"
+            );
+            assert!(
+                card.y >= tile.y + tile.height - TOL,
+                "section {k}: card {card:?} above tile end {tile:?}"
+            );
+            for item in &sec.items {
+                n += 1;
+                let r = rect(&mut s, settings::id(format!("item-{n}")));
+                assert!(inside(r, card), "item {n} {r:?} outside card {card:?}");
+                let label = if item.state.is_some() {
+                    rect(&mut s, settings::id(format!("label-{n}")))
+                } else {
+                    text_rect(&mut s, &item.label)
+                };
+                assert!(
+                    near(label.x, card.x + 14.0),
+                    "item {n}: label starts at {} in card {card:?}",
+                    label.x
+                );
+                if item.state.is_some() {
+                    let state = rect(&mut s, settings::id(format!("state-{n}")));
+                    let dot = rect(&mut s, settings::id(format!("dot-{n}")));
+                    let text = text_rect(&mut s, &item.label);
+                    assert!(
+                        state.y >= text.y + text.height - TOL,
+                        "item {n}: state line {state:?} over label {text:?}"
+                    );
+                    assert!(
+                        near(dot.width, 6.0) && near(dot.height, 6.0),
+                        "item {n}: dot {dot:?}"
+                    );
+                }
+            }
+        }
+        assert_eq!(n, 20, "items");
     });
 }
 
