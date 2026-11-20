@@ -4,6 +4,33 @@ The notable changes of each Puron release. Versions follow
 [Semantic Versioning](https://semver.org/), and the format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [1.6.0] - 2026-11-20
+
+### Added
+
+- Each pinned temperature on the panel shows an icon for its kind of device, such as the CPU, the graphics card, a
+  drive, the Wi-Fi card, a wired network card or a memory module, so that two pinned temperatures can be told apart by
+  the icon alone.
+- Puron is also built as a Flatpak, with the app ID io.github.elalonde.Puron, for the COSMIC Flatpak repository. In its
+  sandbox it reads the same sensors as the .deb, except liquidctl devices: the liquidctl switch stays, and the About
+  page says that liquidctl is not available in the Flatpak.
+- Puron has its own app icon. COSMIC Settings shows it for the applet in every package, and the panel shows its
+  single-color form when nothing is pinned.
+- "About" in the popup now opens a page in the popup with the version, the package (Debian package, Flatpak or built
+  from source), the license, the copyright, the state of each sensor source, and links to the homepage, the source
+  code, the issue tracker and the third-party notices. The details sit in rounded cards, and the state of each sensor
+  source is shown in color, in the desktop theme's colors. A button on that page copies these details for a bug
+  report; they hold no host name, user name or serial number.
+
+### Changed
+
+- "Settings" in the popup now opens the settings as a page in the popup, with the same options. Each group of options
+  has a heading with a colored icon, and its options sit in a rounded card. Under each sensor provider's switch, a line
+  says whether that source is available (with its number of readings), off, not available, or not available in the
+  Flatpak. The separate settings program puron-settings is gone.
+- Every page of the popup has the same side margins.
+- The copyright holder is now Eric Lalonde.
+
 ## [1.5.0] - 2026-11-17
 
 ### Changed
