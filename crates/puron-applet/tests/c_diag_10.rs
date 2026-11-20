@@ -123,18 +123,17 @@ fn body() {
     assert_eq!(read(&mut s), ReadOutcome::Failed, "liquidctl");
     s.stop();
 
-    // applet.app launch-failed: the settings link when no settings
-    // program can be found.
+    // applet.app launch-failed: the homepage link when no browser opener
+    // can be found.
     let c = cfg::build("good");
     let noprog = temp_dir("c-diag-10").join("noprog");
     std::fs::create_dir_all(&noprog).unwrap();
     let programs = Programs {
-        settings_dir: noprog.clone(),
         search_path: noprog.into_os_string(),
     };
     let mut a = app_with(&c.root, &handle(0), programs);
     a.handle(Event::Start);
-    let out = a.handle(Event::SettingsLink);
+    let out = a.handle(Event::HomepageLink);
     assert!(
         out.iter()
             .any(|o| matches!(o, Output::Launch(_, Launched::Failed(_)))),

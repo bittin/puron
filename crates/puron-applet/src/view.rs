@@ -12,11 +12,13 @@ use crate::about;
 use crate::app::{App, Page};
 use crate::panel::{self, Place};
 use crate::popup;
+use crate::settings;
 
 /// A copy of the drawn parts of `App`. `menu` is `None` until the first
 /// layout. `about` holds the About page's plan while `page` is the About
-/// page, and is `None` otherwise; `menu` keeps following the snapshots
-/// meanwhile, so that "Back" shows the latest temperatures.
+/// page, and `settings_page` the Settings page's plan while `page` is the
+/// Settings page; each is `None` otherwise. `menu` keeps following the
+/// snapshots meanwhile, so that "Back" shows the latest temperatures.
 #[derive(Clone, Debug)]
 pub struct View {
     pub menu: Option<Menu>,
@@ -25,6 +27,7 @@ pub struct View {
     pub settings: Settings,
     pub page: Page,
     pub about: Option<about::Plan>,
+    pub settings_page: Option<settings::Plan>,
 }
 
 impl View {
@@ -43,6 +46,7 @@ impl View {
             settings: Settings::default(),
             page: Page::Temperatures,
             about: None,
+            settings_page: None,
         }
     }
 
@@ -55,6 +59,8 @@ impl View {
             settings: app.settings().clone(),
             page: app.page(),
             about: (app.page() == Page::About).then(|| about::plan(&app.about_input())),
+            settings_page: (app.page() == Page::Settings)
+                .then(|| settings::plan(&app.settings_input())),
         }
     }
 

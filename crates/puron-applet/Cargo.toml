@@ -25,7 +25,9 @@ test-catalog = []
 [dev-dependencies]
 puron-applet = { path = ".", features = ["test-catalog"] }
 serde_json.workspace = true
-# `dump` builds the test of puron-soak's dump mode in puron-testkit.
-puron-testkit = { workspace = true, features = ["dump"] }
+# `dump` builds the test of puron-soak's dump mode in puron-testkit;
+# `cfg-writer` gives the Settings page tests a second process that stores
+# a setting, as another program would.
+puron-testkit = { workspace = true, features = ["dump", "cfg-writer"] }
 iced_test.workspace = true
 png.workspace = true

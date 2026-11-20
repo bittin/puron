@@ -9,6 +9,7 @@ pub mod app;
 pub mod copy;
 pub mod panel;
 pub mod popup;
+pub mod settings;
 pub mod view;
 
 /// Set-up that `main` runs before the toolkit starts. Today it only

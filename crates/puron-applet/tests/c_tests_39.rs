@@ -79,7 +79,6 @@ fn c_tests_39() {
         let c = cfg::build("good");
         let open = puron_testkit::workspace_root().join("crates/puron-testkit/fixtures/prog/open");
         let programs = Programs {
-            settings_dir: open.clone(),
             search_path: open.into_os_string(),
         };
         let mut a = app_with(&c.root, &handle(0), programs);

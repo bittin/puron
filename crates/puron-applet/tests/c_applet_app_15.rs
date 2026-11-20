@@ -1,10 +1,11 @@
-//! The settings link starts the settings program detached from the
-//! applet. A fake settings program writes its PID, parent PID and session
-//! ID to a file. The launch must report `Started` and leave no child of
-//! the test process; the program must be alive and not a zombie, and its
-//! parent and session must differ from the test process's. The test has
-//! its own binary because `waitpid(-1)` sees every child of the process,
-//! and a time limit of 10 s because it starts a process.
+//! The homepage link starts the browser opener detached from the applet.
+//! A fake `xdg-open`, first on the search path, writes its PID, parent PID
+//! and session ID to a file, then sleeps. The launch must report
+//! `Started` and leave no child of the test process; the program must be
+//! alive and not a zombie, and its parent and session must differ from
+//! the test process's. The test has its own binary because `waitpid(-1)`
+//! sees every child of the process, and a time limit of 10 s because it
+//! starts a process.
 #![allow(non_snake_case)]
 
 mod common;
@@ -28,15 +29,13 @@ fn c_applet_app_15() {
     std::env::set_var("PURON_TEST_PIDFILE", &file);
     puron_testkit::limit("C-applet.app-15", 10, move || {
         let c = cfg::build("good");
-        let dir =
-            puron_testkit::workspace_root().join("crates/puron-testkit/fixtures/prog/settings");
+        let dir = puron_testkit::workspace_root().join("crates/puron-testkit/fixtures/prog/sleep");
         let programs = Programs {
-            settings_dir: dir,
-            search_path: Default::default(),
+            search_path: dir.into_os_string(),
         };
         let mut a = app_with(&c.root, &handle(0), programs);
         a.handle(Event::Start);
-        let out = a.handle(Event::SettingsLink);
+        let out = a.handle(Event::HomepageLink);
         assert!(echild(-1), "waitpid(-1) after the launch");
         assert!(
             out.iter()

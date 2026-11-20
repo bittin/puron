@@ -486,11 +486,13 @@ fn c_applet_popup_13() {
             .iter()
             .position(|e| matches!(e, Drawn::SettingsLink { .. }))
             .expect("settings link");
+        // The entry "Settings" shows the Settings page in the same popup,
+        // which stays open; it starts no program.
         assert_eq!(
             popup::click(&plan.entries[i]),
             Reply {
-                event: Some(Event::SettingsLink),
-                close: true
+                event: Some(Event::Settings),
+                close: false
             }
         );
     });

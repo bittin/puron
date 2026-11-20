@@ -52,12 +52,11 @@ pub fn handle(shutdown_secs: u64) -> Arc<eng::Handle> {
     eng::Handle::new(Duration::from_secs(shutdown_secs))
 }
 
-/// Program locations in an empty temporary directory, for tests that
-/// start no program: neither program can be found there.
+/// A search path of one empty temporary directory, for tests that start
+/// no program: the browser opener cannot be found there.
 pub fn no_programs() -> Programs {
     let dir = puron_testkit::temp_dir("noprog");
     Programs {
-        settings_dir: dir.clone(),
         search_path: dir.into_os_string(),
     }
 }

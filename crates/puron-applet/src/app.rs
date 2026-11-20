@@ -1,9 +1,8 @@
 //! The applet's logic, with no UI code. `App` takes one `Event` at a time
-//! and returns the `Output`s it produced; `launch` starts the settings
-//! program or the browser opener; `run` is the event loop that feeds
-//! `App`. The engine handle, the config and the programs' locations are
-//! parameters, so tests can drive `App` with a fake engine and without a
-//! display.
+//! and returns the `Output`s it produced; `launch` starts the browser
+//! opener; `run` is the event loop that feeds `App`. The engine handle,
+//! the config and the opener's search path are parameters, so tests can
+//! drive `App` with a fake engine and without a display.
 
 use std::ffi::{CString, OsString};
 use std::os::unix::ffi::OsStrExt;
@@ -24,6 +23,7 @@ use puron_engine::registry;
 
 use crate::about::{self, Package};
 use crate::copy;
+use crate::settings;
 
 /// The calls that `App` makes on the engine. `Engine` implements it; the
 /// tests use a fake.
@@ -92,19 +92,24 @@ pub enum Event {
     Delivery(Delivery),
     /// A click on the popup line with this identity.
     PinClick(String),
-    /// A click on the settings link: start the settings program.
-    SettingsLink,
+    /// A click on the entry "Settings": the popup shows the Settings page.
+    Settings,
+    /// A message of a control of the Settings page: its change is stored.
+    Edit(settings::Edit),
     /// A click on the no-readings message: open the homepage in the
     /// browser.
     HomepageLink,
     /// A click on the entry "About": the popup shows the About page.
     About,
-    /// A click on "Back" on the About page: the popup shows the
-    /// temperatures again.
+    /// A click on "Back" on the About page or the Settings page: the popup
+    /// shows the temperatures again.
     Back,
     /// The window loop opens the popup. It always opens on the
-    /// temperatures, even when it was closed on the About page.
+    /// temperatures, even when it was closed on another page.
     PopupOpened,
+    /// The popup closed, by a click outside it, the panel button or a
+    /// link.
+    PopupClosed,
     /// A click on a link of the About page: open its address in the
     /// browser.
     OpenLink(String),
@@ -164,41 +169,42 @@ pub enum Output {
     /// The text that "Copy details" puts on the clipboard. The window loop
     /// writes it there.
     Copy(String),
+    /// A setting changed on the Settings page was written to the config,
+    /// with the result. It applies only when the config watch reports it.
+    Setting {
+        key: &'static str,
+        value: Value,
+        result: StoreResult,
+    },
 }
 
-/// Which page the popup shows: the temperatures, or the About page in
-/// their place.
+/// Which page the popup shows: the temperatures, or the About page or the
+/// Settings page in their place.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Page {
     Temperatures,
     About,
+    Settings,
 }
 
-/// Where `App` finds the two programs it can start. They are parameters
-/// so that tests can point them elsewhere.
+/// Where `App` looks for the program it can start, the browser opener. It
+/// is a parameter so that tests can point it elsewhere.
 #[derive(Clone, Debug)]
 pub struct Programs {
-    /// The directory that holds `puron-settings`.
-    pub settings_dir: PathBuf,
     /// The directories searched for `xdg-open`, in the form of `PATH`.
     pub search_path: OsString,
 }
 
 impl Programs {
-    /// The locations for the installed applet: `puron-settings` next to
-    /// the running binary (`/proc/self/exe`), and `xdg-open` along the
-    /// applet's own `PATH`. Either is left empty when it cannot be read.
+    /// The location for the installed applet: `xdg-open` along the
+    /// applet's own `PATH`, left empty when it is not set.
     pub fn production() -> Programs {
-        let exe = std::fs::read_link("/proc/self/exe").unwrap_or_default();
         Programs {
-            settings_dir: exe.parent().map(Path::to_path_buf).unwrap_or_default(),
             search_path: std::env::var_os("PATH").unwrap_or_default(),
         }
     }
 }
 
-/// The file name of the settings program.
-pub const SETTINGS_PROGRAM: &str = "puron-settings";
 /// The program that opens the homepage in the user's browser.
 pub const OPENER: &str = "xdg-open";
 
@@ -278,6 +284,15 @@ pub struct App {
     page: Page,
     /// The file that "Copy details" reads the kernel release from.
     kernel_file: PathBuf,
+    /// The value each control of the Settings page shows. Each opening of
+    /// the page starts from `settings`; a control's change sets its own
+    /// value here, and `settings` follows only when the watch reports it.
+    values: Settings,
+    /// The text typed into the page's number field and not yet taken.
+    typed: Option<String>,
+    /// The latest store of a control's setting failed; the page shows a
+    /// notice until a later one succeeds.
+    notice: bool,
 }
 
 fn kind_word(k: ProblemKind) -> &'static str {
@@ -314,6 +329,9 @@ impl App {
             stopped: false,
             page: Page::Temperatures,
             kernel_file: PathBuf::from(copy::KERNEL_RELEASE_FILE),
+            values: Settings::default(),
+            typed: None,
+            notice: false,
         }
     }
 
@@ -337,6 +355,17 @@ impl App {
             version: about::VERSION.to_string(),
             package: Package::built(),
             sources: about::sources(self.last.as_ref(), &self.settings),
+        }
+    }
+
+    /// What the Settings page is drawn from: the value each control
+    /// shows, the text being typed into the number field, and whether the
+    /// latest store failed.
+    pub fn settings_input(&self) -> settings::Input {
+        settings::Input {
+            values: self.values.clone(),
+            typed: self.typed.clone(),
+            notice: self.notice,
         }
     }
 
@@ -367,6 +396,13 @@ impl App {
     /// lays out the popup and the panel again.
     pub fn handle(&mut self, event: Event) -> Vec<Output> {
         let mut out = Vec::new();
+        // Leaving the Settings page, by "Back" or by closing the popup,
+        // takes the text typed into its number field first, as a focus
+        // loss would, so that a value the user typed is not lost.
+        if matches!(event, Event::Back | Event::PopupClosed) {
+            let stores = settings::leave(&mut self.values, &mut self.typed);
+            self.store_settings(stores, &mut out);
+        }
         match event {
             Event::Start => self.start(&mut out),
             Event::Snapshot(s) => {
@@ -379,14 +415,21 @@ impl App {
             }
             Event::Delivery(d) => self.delivery(d, &mut out),
             Event::PinClick(id) => self.pin_click(&id, &mut out),
-            Event::SettingsLink => {
-                let path = self.programs.settings_dir.join(SETTINGS_PROGRAM);
-                let r = launch(&path, &[]);
-                self.launched(path, r, &mut out);
+            // The page starts from the settings as last loaded or reported.
+            // Nothing is stored and nothing is started.
+            Event::Settings => {
+                self.page = Page::Settings;
+                self.values = self.settings.clone();
+                self.typed = None;
             }
+            Event::Edit(e) => {
+                let stores = settings::edit(&mut self.values, &mut self.typed, e);
+                self.store_settings(stores, &mut out);
+            }
+            Event::PopupClosed => {}
             Event::HomepageLink => self.open_url(menu::HOMEPAGE_URL, &mut out),
             Event::OpenLink(url) => self.open_url(&url, &mut out),
-            // The page changes only on these three events. A snapshot or a
+            // The page changes only on these events and on Settings. A snapshot or a
             // settings change keeps it, and keeps computing the
             // temperatures' layout, which "Back" then shows.
             Event::About => self.page = Page::About,
@@ -432,6 +475,20 @@ impl App {
         let input = self.about_input();
         let kernel = copy::kernel_release(&self.kernel_file);
         copy::text(&input.version, input.package, &kernel, &input.sources)
+    }
+
+    /// Writes each of `stores` to the config, in order, and records it in
+    /// `out`. A failed store is not undone: the control keeps the new
+    /// value and the page shows a notice until a later store succeeds; the
+    /// value is stored again only at the control's next change. Nothing is
+    /// applied here: the config watch reports a stored value, and
+    /// `delivery` applies it as a change made by another program.
+    fn store_settings(&mut self, stores: Vec<settings::Store>, out: &mut Vec<Output>) {
+        for (key, value) in stores {
+            let result = self.config.store(key, &value);
+            self.notice = result == StoreResult::Failed;
+            out.push(Output::Setting { key, value, result });
+        }
     }
 
     /// Records `e` in `out` and logs it. `diag::event` drops it while
@@ -601,6 +658,8 @@ impl App {
             out.push(Output::Switch(n.debug_logging));
         }
         self.problems(&d.loaded.problems, out);
+        // The Settings page shows what was stored, also its own changes.
+        self.values = settings::delivered(&self.values, &self.typed, &self.settings);
         let units = o.show_temperature_unit != n.show_temperature_unit
             || o.show_rotation_rate_unit != n.show_rotation_rate_unit
             || o.show_voltage_unit != n.show_voltage_unit

@@ -1,9 +1,12 @@
-//! When neither program can be found, both links report a failed launch
-//! with `ENOENT` (2) and leave no child process. The settings link's
-//! failure also logs a `launch-failed` event with errno 2. Both program
-//! locations point at an empty directory. The test has its own binary
-//! because `waitpid(-1)` sees every child of the process and the
-//! diagnostics socket is process-wide.
+//! A browser opener that cannot run makes the homepage link report a
+//! failed launch with `ENOENT` (2) and leave no child process. First the
+//! search path holds an `xdg-open` whose interpreter does not exist, so
+//! the failure happens after the launch has forked and must come back
+//! through the launch's pipe; the failure also logs a `launch-failed`
+//! event with errno 2. Then the search path is an empty directory, and
+//! the launch fails before any fork. The test has its own binary because
+//! `waitpid(-1)` sees every child of the process and the diagnostics
+//! socket is process-wide.
 #![allow(non_snake_case)]
 
 mod common;
@@ -29,15 +32,14 @@ fn c_applet_app_16() {
         let j = Journal::new("c-applet-app-16");
         diag::set_socket(&j.path);
         let c = cfg::build("good");
-        let noprog = puron_testkit::temp_dir("c-applet-app-16").join("noprog");
-        std::fs::create_dir_all(&noprog).unwrap();
+        let badexec =
+            puron_testkit::workspace_root().join("crates/puron-testkit/fixtures/prog/badexec");
         let programs = Programs {
-            settings_dir: noprog.clone(),
-            search_path: noprog.clone().into_os_string(),
+            search_path: badexec.into_os_string(),
         };
         let mut a = app_with(&c.root, &handle(0), programs);
         a.handle(Event::Start);
-        let out = a.handle(Event::SettingsLink);
+        let out = a.handle(Event::HomepageLink);
         assert!(echild(), "a child left");
         assert!(
             out.iter()
@@ -48,6 +50,14 @@ fn c_applet_app_16() {
         assert_eq!(got.len(), 1);
         assert_eq!(jrn::field(&got[0], "PURON_EVENT"), Some("launch-failed"));
         assert_eq!(jrn::field(&got[0], "PURON_ERRNO"), Some("2"));
+
+        let noprog = puron_testkit::temp_dir("c-applet-app-16").join("noprog");
+        std::fs::create_dir_all(&noprog).unwrap();
+        let programs = Programs {
+            search_path: noprog.into_os_string(),
+        };
+        let mut a = app_with(&c.root, &handle(0), programs);
+        a.handle(Event::Start);
         let out = a.handle(Event::HomepageLink);
         assert!(echild(), "a child left");
         assert!(

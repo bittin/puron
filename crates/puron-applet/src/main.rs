@@ -22,15 +22,15 @@ use cosmic::iced::Subscription;
 use cosmic::Element;
 use puron_applet::app::{self, App, Event, Output, Page, Programs, Source};
 use puron_applet::view::View;
-use puron_applet::{about, panel, popup};
+use puron_applet::{about, panel, popup, settings};
 use puron_config::Config;
 use puron_engine::clock::SystemClock;
 use puron_engine::engine::Engine;
 
 /// The libcosmic application's messages: a new view from the event loop,
-/// a press on the panel button, a click in the popup's temperatures or on
-/// its About page, the popup window closed by the compositor, and a text
-/// from the event loop to put on the clipboard.
+/// a press on the panel button, a click in the popup's temperatures, on
+/// its About page or on its Settings page, the popup window closed by the
+/// compositor, and a text from the event loop to put on the clipboard.
 #[derive(Clone, Debug)]
 enum Msg {
     View(Box<View>),
@@ -38,6 +38,7 @@ enum Msg {
     Clicked(popup::Clicked),
     PopupClosed(Id),
     AboutClicked(about::Clicked),
+    SettingsClicked(settings::Clicked),
     Copy(String),
 }
 
@@ -84,7 +85,8 @@ impl Applet {
         let event = match e {
             popup::Event::PinClick(id) => Event::PinClick(id),
             popup::Event::HomepageLink => Event::HomepageLink,
-            popup::Event::SettingsLink => Event::SettingsLink,
+            popup::Event::Settings => Event::Settings,
+            popup::Event::Edit(e) => Event::Edit(e),
             popup::Event::About => Event::About,
             popup::Event::Back => Event::Back,
             popup::Event::OpenLink(url) => Event::OpenLink(url),
@@ -93,9 +95,14 @@ impl Applet {
         let _ = self.tx.send((Source::Ui, event));
     }
 
+    /// Closes the popup, and tells the event loop, which takes the text
+    /// still typed on the Settings page.
     fn close(&mut self) -> Task<Msg> {
         match self.popup_id.take() {
-            Some(id) => destroy_popup(id),
+            Some(id) => {
+                let _ = self.tx.send((Source::Ui, Event::PopupClosed));
+                destroy_popup(id)
+            }
             None => Task::none(),
         }
     }
@@ -150,11 +157,12 @@ impl cosmic::Application for Applet {
                 };
                 // The popup always opens on the temperatures. The view is
                 // switched here too, so that the first drawing does not
-                // show the About page before the event loop's new view
+                // show another page before the event loop's new view
                 // arrives.
                 let _ = self.tx.send((Source::Ui, Event::PopupOpened));
                 self.view.page = Page::Temperatures;
                 self.view.about = None;
+                self.view.settings_page = None;
                 let id = Id::unique();
                 self.popup_id = Some(id);
                 let mut settings = self
@@ -180,6 +188,19 @@ impl cosmic::Application for Applet {
             Msg::PopupClosed(id) => {
                 if self.popup_id == Some(id) {
                     self.popup_id = None;
+                    let _ = self.tx.send((Source::Ui, Event::PopupClosed));
+                }
+            }
+            Msg::SettingsClicked(clicked) => {
+                let Some(plan) = self.view.settings_page.as_ref() else {
+                    return Task::none();
+                };
+                let reply = settings::clicked(plan, clicked);
+                if let Some(e) = reply.event {
+                    self.send(e);
+                }
+                if reply.close {
+                    return self.close();
                 }
             }
             Msg::AboutClicked(clicked) => {
@@ -212,10 +233,13 @@ impl cosmic::Application for Applet {
     fn view_window(&self, id: Id) -> Element<'_, Msg> {
         match (self.popup_id == Some(id), self.popup_plan()) {
             (true, Some(plan)) => {
-                // The About page takes the width that the temperatures
-                // have, in the same surface.
-                let content = match (self.view.page, &self.view.about) {
-                    (Page::About, Some(about)) => about::view(about).map(Msg::AboutClicked),
+                // The About page and the Settings page take the width that
+                // the temperatures have, in the same surface.
+                let content = match (self.view.page, &self.view.about, &self.view.settings_page) {
+                    (Page::About, Some(about), _) => about::view(about).map(Msg::AboutClicked),
+                    (Page::Settings, _, Some(page)) => {
+                        settings::view(page).map(Msg::SettingsClicked)
+                    }
                     _ => popup::view(&plan).map(Msg::Clicked),
                 };
                 let width = self.view.popup_width(&panel::Place::of(&self.core.applet));

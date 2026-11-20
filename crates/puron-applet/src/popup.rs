@@ -96,6 +96,7 @@ pub enum Drawn {
     HomepageLink {
         text: String,
     },
+    /// The entry "Settings", which shows the Settings page in the popup.
     SettingsLink {
         text: String,
     },
@@ -118,16 +119,19 @@ pub enum Event {
     PinClick(String),
     /// Open the project homepage in the browser.
     HomepageLink,
-    /// Start the settings program.
-    SettingsLink,
+    /// Show the Settings page in place of the temperatures.
+    Settings,
     /// Show the About page in place of the temperatures.
     About,
-    /// Show the temperatures again, from the About page.
+    /// Show the temperatures again, from the About page or the Settings
+    /// page.
     Back,
     /// Open this address of the About page in the browser.
     OpenLink(String),
     /// Copy the About page's summary to the clipboard.
     CopyDetails,
+    /// A message of a control of the Settings page.
+    Edit(crate::settings::Edit),
 }
 
 /// The answer to a click: the event to send, if any, and whether the
@@ -166,17 +170,17 @@ pub fn clicked(plan: &Plan, clicked: Clicked) -> Reply {
         }
         Clicked::Message => (Some(Event::HomepageLink), true),
         Clicked::HomepageLink => (Some(Event::About), false),
-        Clicked::SettingsLink => (Some(Event::SettingsLink), true),
+        Clicked::SettingsLink => (Some(Event::Settings), false),
     };
     Reply { event, close }
 }
 
 /// The answer to a click on a drawn entry. A line sends `Event::PinClick`
-/// and leaves the popup open. The entry "About" sends `Event::About` and
-/// leaves it open too, because the About page shows in the same popup.
-/// The message sends `Event::HomepageLink` and the settings link
-/// `Event::SettingsLink`; these two close the popup, because the user
-/// turns to the browser or the settings window. Headings and separators
+/// and leaves the popup open. The entries "About" and "Settings" send
+/// `Event::About` and `Event::Settings` and leave it open too, because
+/// their pages show in the same popup. The message sends
+/// `Event::HomepageLink` and closes the popup, because the user turns to
+/// the browser. Headings and separators
 /// do nothing.
 pub fn click(entry: &Drawn) -> Reply {
     let (event, close) = match entry {
@@ -184,7 +188,7 @@ pub fn click(entry: &Drawn) -> Reply {
         Drawn::Section { .. } | Drawn::Device { .. } | Drawn::Separator => (None, false),
         Drawn::Message { .. } => (Some(Event::HomepageLink), true),
         Drawn::HomepageLink { .. } => (Some(Event::About), false),
-        Drawn::SettingsLink { .. } => (Some(Event::SettingsLink), true),
+        Drawn::SettingsLink { .. } => (Some(Event::Settings), false),
     };
     Reply { event, close }
 }
