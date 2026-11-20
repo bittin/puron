@@ -2,7 +2,7 @@
 # Checks that a missing locale fails loudly rather than passing. With
 # LOCPATH set to an empty directory, glibc loads no installed locale;
 # then the locale tests (c_core_order_10 in puron-core, c_i18n_12 in
-# puron-applet and in puron-settings) and tools/check-test-host.sh must
+# puron-applet) and tools/check-test-host.sh must
 # each exit non-zero. Each test must print HOST NEED tr_TR.UTF-8 on
 # standard error, and the host check must report both locales MISSING.
 # Usage: tools/c_tests_7.sh
@@ -29,8 +29,6 @@ run order cargo test -p puron-core --test c_core_order c_core_order_10 -- --noca
 need order
 run applet cargo test -p puron-applet --test c_i18n_12 -- --nocapture
 need applet
-run settings cargo test -p puron-settings --test c_i18n_12 -- --nocapture
-need settings
 run host sh tools/check-test-host.sh
 n=$(cat "$tmp/host.out" "$tmp/host.err" | grep -cE '^MISSING locale (tr_TR|de_DE)\.UTF-8$')
 echo "C-tests-7: host MISSING locale lines $n"

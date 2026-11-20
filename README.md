@@ -121,13 +121,13 @@ packages:
 
     sudo apt install clang libsensors-dev libwayland-dev libxkbcommon-dev pkg-config
 
-Then build Puron. `make install-bin` builds the two programs,
-`puron-applet` and `puron-settings`, and copies them into
-`$DESTDIR/usr/bin`; `cargo build --release` only builds them:
+Then build Puron. `make install-bin` builds the program `puron-applet`
+and copies it into `$DESTDIR/usr/bin`; `cargo build --release` only
+builds it:
 
     make install-bin DESTDIR=/tmp/puron-root   # or: cargo build --release
 
-`make install PREFIX=/usr/local` builds and installs the programs, their
+`make install PREFIX=/usr/local` builds and installs the program, its
 icons and the applet's desktop entry under `/usr/local`, without a
 package. It needs write access to `/usr/local`.
 
@@ -182,20 +182,17 @@ missing.
 
 Puron's source files are MIT; see `LICENSE`.
 
-The `puron-applet` binary links `cosmic-panel-config` and
+Puron's one binary, `puron-applet`, links `cosmic-panel-config` and
 `xdg-shell-wrapper-config` (GPL-3.0-only) and is therefore distributed
 as a GPL-3.0 combined work; see `data/licenses/GPL-3.0.txt`. It also
 links the libcosmic crates and `option-ext` (MPL-2.0), `udisks2`
 (LGPL-2.1) and crates under permissive licenses.
 
-The `puron-settings` binary is MIT and links the libcosmic crates and
-`option-ext` (MPL-2.0) and crates under permissive licenses.
-
 The package ships the GPL-3.0 text, `SOURCE-OFFER` and
 `THIRD-PARTY-NOTICES.txt` in `/usr/share/doc/puron/`. The notices file
 lists every crate in `Cargo.lock` with its license and notices.
 
-The complete corresponding source of the binaries is the release asset
+The complete corresponding source of the binary is the release asset
 `puron-1.5.0-source.tar.xz` of the tag `v1.5.0`: Puron's full source
 with the locked dependencies vendored and the cargo config for an
 offline build. `make source-archive` writes this archive to

@@ -36,7 +36,7 @@ field() { dpkg-deb --field "$deb" "$1"; }
 field Depends | tr ',' '\n' | sed 's/^ *//' | grep -qE '^libsensors5( |$)' || fail "Depends has no libsensors5: $(field Depends)"
 field Depends | tr ',' '\n' | sed 's/^ *//' | grep -qE '^libc6( |$)' || fail "Depends has no libc6 (dpkg-shlibdeps): $(field Depends)"
 grep -q '^ Depends: ' "$tmp/info" || fail "no Depends line in --info"
-for p in usr/bin/puron-applet usr/bin/puron-settings \
+for p in usr/bin/puron-applet \
     usr/share/applications/io.github.elalonde.Puron.desktop \
     usr/share/metainfo/io.github.elalonde.Puron.metainfo.xml \
     usr/share/icons/hicolor/scalable/apps/io.github.elalonde.Puron.svg \
@@ -51,7 +51,7 @@ for f in data/icons/hicolor/scalable/status/*.svg; do
 done
 grep -E '^-' "$tmp/contents" | grep -E ' \./usr/bin/' | grep -qvE '^-rwxr-xr-x root/root ' && fail "a binary is not -rwxr-xr-x root/root"
 n=$(grep -cE '^-' "$tmp/contents")
-want=$(( 11 + $(ls data/icons/hicolor/scalable/status/*.svg | wc -l) ))
+want=$(( 10 + $(ls data/icons/hicolor/scalable/status/*.svg | wc -l) ))
 [ "$n" = "$want" ] || fail "$n files, want $want"
 dpkg-deb -x "$deb" "$tmp/x" || fail "dpkg-deb -x"
 grep -qx 'Exec=/usr/bin/puron-applet' "$tmp/x/usr/share/applications/io.github.elalonde.Puron.desktop" \
@@ -62,7 +62,13 @@ doc=$tmp/x/usr/share/doc/puron
 cmp -s "$doc/GPL-3.0.txt" data/licenses/GPL-3.0.txt || fail "GPL-3.0.txt differs from data/licenses/GPL-3.0.txt"
 grep -q 'GNU GENERAL PUBLIC LICENSE' data/licenses/GPL-3.0.txt || fail "data/licenses/GPL-3.0.txt is not the GPL"
 grep -q '^Files: usr/bin/puron-applet$' "$doc/copyright" || fail "copyright has no paragraph for puron-applet"
-grep -q '^Files: usr/bin/puron-settings$' "$doc/copyright" || fail "copyright has no paragraph for puron-settings"
+# Puron is one program: the package holds no other binary, and the
+# copyright has a paragraph for no other binary, such as the separate
+# settings program of versions up to 1.5.
+bins=$(grep -E ' \./usr/bin/[^/]+$' "$tmp/contents" | sed 's/.* \.\/usr\/bin\///' | tr '\n' ' ')
+[ "$bins" = "puron-applet " ] || fail "usr/bin holds $bins, want puron-applet alone"
+other=$(grep '^Files: usr/bin/' "$doc/copyright" | grep -vx 'Files: usr/bin/puron-applet')
+[ -z "$other" ] || fail "copyright has a paragraph for another binary: $other"
 grep -qE '^License: GPL-3\.0-only( |$)' "$doc/copyright" || fail "copyright names no GPL-3.0-only"
 for l in GPL-3.0-only MPL-2.0 LGPL-2.1 NVIDIA-NVML-notice; do
     grep -qx "License: $l" "$doc/copyright" || fail "copyright has no $l paragraph"
@@ -99,7 +105,7 @@ fi
 # binary's read-only data, at least 6 characters long, because short
 # words occur by chance in machine code.
 grep -rqF "$HOME/" "$tmp/x/usr" && fail "the package holds this home path"
-for b in puron-applet puron-settings; do
+for b in puron-applet; do
     strings -a "$tmp/x/usr/bin/$b" > "$tmp/s" || fail "strings $b"
     grep -q '/home/' "$tmp/s" && fail "$b holds a home path: $(grep -m 1 '/home/' "$tmp/s" | cut -c1-120)"
     if [ -n "${PURON_TERMS:-}" ]; then

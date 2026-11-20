@@ -22,15 +22,6 @@ Comment: Puron's source files are under MIT terms. This binary links
  MIT-0, Unicode-3.0, Unlicense or Zlib terms, and bindings generated from
  NVIDIA's NVML header.
 
-Files: usr/bin/puron-settings
-Copyright: 2026 Eric Lalonde, and the authors of the Rust crates the binary is
- built from (see THIRD-PARTY-NOTICES.txt)
-License: MIT and MPL-2.0
-Comment: This binary links the libcosmic crates and option-ext (MPL-2.0)
- and crates under MIT, Apache-2.0, BSD-2-Clause, BSD-3-Clause, BSL-1.0,
- CC0-1.0, ISC, MIT-0, Unicode-3.0, Unlicense or Zlib terms. It links no
- GPL-3.0 crate and neither udisks2 nor the NVML bindings.
-
 License: MIT
  Copyright (c) 2026 Eric Lalonde
  .

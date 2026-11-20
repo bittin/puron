@@ -12,12 +12,12 @@ SCRIPT_CHECKS := tools/lint-a.sh tools/c_tests_1.sh tools/c_tests_2.sh tools/c_t
     tools/c_tests_6.sh tools/c_src_registry_7.sh \
     tools/c_engine_15.sh tools/c_i18n_10.sh tools/c_i18n_15.sh \
     tools/c_tests_7.sh tools/c_applet_panel_10.sh tools/c_applet_app_19.sh \
-    tools/c_i18n_11.sh tools/c_settings_window_15.sh tools/c_settings_window_17.sh \
+    tools/c_i18n_11.sh \
     tools/read-only-run.sh tools/c_applet_panel_15.sh \
     tools/c_tests_18.sh tools/c_tests_19.sh tools/c_tests_20.sh tools/c_tests_21.sh \
     tools/c_tests_22.sh tools/c_tests_23.sh tools/c_tests_24.sh tools/c_tests_25.sh \
     tools/c_tests_26.sh tools/c_tests_27.sh tools/c_tests_28.sh tools/c_tests_29.sh \
-    tools/c_tests_30.sh tools/c_tests_35.sh tools/c_tests_42.sh
+    tools/c_tests_30.sh tools/c_tests_35.sh tools/c_tests_42.sh tools/c_tests_48.sh
 
 .PHONY: check setup deb check-deb source-archive install install-bin install-icons install-desktop \
     install-appicon install-metainfo install-licenses install-license-texts install-notices
@@ -42,10 +42,9 @@ TARGET_DIR := $(or $(CARGO_TARGET_DIR),target)
 install: install-bin install-icons install-desktop install-appicon install-metainfo
 
 install-bin:
-	PURON_PACKAGE=$(PACKAGE) cargo build --release --locked -p puron-applet -p puron-settings
+	PURON_PACKAGE=$(PACKAGE) cargo build --release --locked -p puron-applet
 	install -d $(DESTDIR)$(PREFIX)/bin
-	install -m 755 $(TARGET_DIR)/release/puron-applet $(TARGET_DIR)/release/puron-settings \
-	    $(DESTDIR)$(PREFIX)/bin/
+	install -m 755 $(TARGET_DIR)/release/puron-applet $(DESTDIR)$(PREFIX)/bin/
 
 # PACKAGE names the package that the binaries are built for, which the
 # applet shows on its About page: deb for the Debian package

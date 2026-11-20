@@ -144,7 +144,7 @@ collect() {
             printf 'xdg-open\t%s\n' "$(yes_no command -v xdg-open)"
             printf 'liquidctl\t%s\n' "$(yes_no command -v liquidctl)"
             n=0
-            for f in /app/bin/puron-applet /app/bin/puron-settings \
+            for f in /app/bin/puron-applet \
                 /app/share/applications/$app.desktop \
                 /app/share/metainfo/$app.metainfo.xml \
                 /app/share/icons/hicolor/scalable/apps/$app.svg \
@@ -204,7 +204,7 @@ compare() {
     # What the Flatpak must hold, and the one program it must not.
     want xdg-open yes
     want liquidctl no
-    want files 11
+    want files 10
     want leftovers 0
 
     if [ "$mode" = installed ]; then

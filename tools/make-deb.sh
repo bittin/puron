@@ -21,7 +21,7 @@ cargo_home=${CARGO_HOME:-$HOME/.cargo}
 RUSTFLAGS="${RUSTFLAGS:+$RUSTFLAGS }--remap-path-prefix=$cargo_home=/cargo --remap-path-prefix=$PWD=/build --remap-path-prefix=$target=/build/target"
 export RUSTFLAGS
 make -s install DESTDIR="$stage" PREFIX=/usr PACKAGE=deb || exit 1
-strip --strip-unneeded "$stage/usr/bin/puron-applet" "$stage/usr/bin/puron-settings" || exit 1
+strip --strip-unneeded "$stage/usr/bin/puron-applet" || exit 1
 install -d "$stage/usr/share/doc/puron" || exit 2
 install -m 644 debian/copyright "$stage/usr/share/doc/puron/copyright" || exit 2
 gzip -9n < debian/changelog > "$stage/usr/share/doc/puron/changelog.gz" || exit 2
@@ -36,7 +36,7 @@ chmod 644 "$stage"/usr/share/doc/puron/*
 # minimal one in the work directory is enough.
 mkdir -p "$work/src/debian" || exit 2
 printf 'Source: puron\n\nPackage: puron\nArchitecture: any\n' > "$work/src/debian/control"
-shl=$(cd "$work/src" && dpkg-shlibdeps -O -e"$stage/usr/bin/puron-applet" -e"$stage/usr/bin/puron-settings" 2> ../shlibdeps.err) \
+shl=$(cd "$work/src" && dpkg-shlibdeps -O -e"$stage/usr/bin/puron-applet" 2> ../shlibdeps.err) \
     || { cat "$work/shlibdeps.err"; exit 1; }
 deps=$(printf '%s\n' "$shl" | sed -n 's/^shlibs:Depends=//p')
 case ", $deps," in

@@ -34,7 +34,7 @@ tab=$(printf '\t')
 printf '%s\n' "cosmic-theme${tab}yes" "cpus${tab}8" "dmi${tab}Box" \
     "hwmon${tab}acpitz,coretemp,nvme" "journal${tab}yes" "nvme${tab}Disk A" \
     "sensors-conf${tab}abc" "sensors-d${tab}x.conf" > "$tmp/H"
-printf '%s\n' "cosmic-icons${tab}4" "cpus${tab}8" "dmi${tab}Box" "files${tab}11" \
+printf '%s\n' "cosmic-icons${tab}4" "cpus${tab}8" "dmi${tab}Box" "files${tab}10" \
     "hwmon${tab}acpitz,coretemp,nvme" "journal${tab}yes" "leftovers${tab}0" \
     "libsensors-chips${tab}3" "libsensors-init${tab}0" "libsensors-stderr${tab}0" \
     "liquidctl${tab}no" "nvme${tab}Disk A" \
@@ -68,7 +68,7 @@ variant b liquidctl yes
 fails_on b liquidctl
 variant c sensors-conf -
 fails_on c sensors-conf
-variant d files 10
+variant d files 9
 fails_on d files
 variant e cosmic-icons 3
 fails_on e cosmic-icons

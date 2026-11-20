@@ -4127,23 +4127,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "puron-settings"
-version = "1.5.0"
-dependencies = [
- "i18n-embed",
- "i18n-embed-fl",
- "iced_test",
- "libc",
- "libcosmic",
- "png 0.17.16",
- "puron-config",
- "puron-core",
- "puron-settings",
- "puron-testkit",
- "rust-embed",
-]
-
-[[package]]
 name = "puron-testkit"
 version = "1.5.0"
 dependencies = [

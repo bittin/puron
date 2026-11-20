@@ -114,7 +114,6 @@ if urls != want_urls:
 children(one("provides"), "provides", [
     ("id", {}, "com.system76.CosmicApplet"),
     ("binary", {}, "puron-applet"),
-    ("binary", {}, "puron-settings"),
 ])
 children(one("branding"), "branding", [
     ("color", {"type": "primary", "scheme_preference": "light"}, "#f2b33d"),

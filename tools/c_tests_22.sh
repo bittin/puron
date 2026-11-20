@@ -3,7 +3,7 @@
 # Debian package and the Flatpak each run it, with PREFIX=/usr and
 # PREFIX=/app, and neither copies files of its own. A dry run of make
 # install with PREFIX=/app (make -n prints the commands and runs none, so
-# nothing is built) must name the binaries, the desktop entry, the panel
+# nothing is built) must name the binary, the desktop entry, the panel
 # icons, both forms of the app icon and the metainfo, all under the
 # prefix, and no license directory, which only the Flatpak's own target
 # writes. A real run of the targets other than the build must then write

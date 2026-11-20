@@ -19,7 +19,7 @@ count 1 "LICENSE lines 'Copyright (c) 2026 Eric Lalonde'" -cx 'Copyright (c) 202
 count 0 "LICENSE lines that name elalonde" -c elalonde LICENSE
 d=debian/copyright
 count 1 "$d lines 'Copyright: 2026 Eric Lalonde'" -cx 'Copyright: 2026 Eric Lalonde' "$d"
-count 2 "$d holder lines of the two binaries" \
+count 1 "$d holder lines of the binary" \
     -c '^Copyright: 2026 Eric Lalonde, and the authors of the Rust crates the binary is$' "$d"
 count 1 "$d lines ' Copyright (c) 2026 Eric Lalonde'" -cx ' Copyright (c) 2026 Eric Lalonde' "$d"
 count 0 "$d lines that name '2026 elalonde'" -c '2026 elalonde' "$d"

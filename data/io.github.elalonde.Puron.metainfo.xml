@@ -35,7 +35,6 @@
   <provides>
     <id>com.system76.CosmicApplet</id>
     <binary>puron-applet</binary>
-    <binary>puron-settings</binary>
   </provides>
   <branding>
     <color type="primary" scheme_preference="light">#f2b33d</color>

@@ -1,9 +1,9 @@
 //! The translated texts: the Fluent catalogs, the choice of language at
-//! start-up, and the lookup of a message. This one file is compiled into
-//! both `puron-applet` and `puron-settings` (the settings crate includes
-//! it by path). Each crate's `i18n.toml` gives the same catalog directory,
-//! `i18n/` at the workspace root, the domain `puron` and the fallback
-//! language `en`, which the `fl!` macro reads at build time.
+//! start-up, and the lookup of a message. This file is compiled into
+//! `puron-applet`, the one program. The crate's `i18n.toml` gives the
+//! catalog directory, `i18n/` at the workspace root, the domain `puron`
+//! and the fallback language `en`, which the `fl!` macro reads at build
+//! time.
 
 use std::ffi::{OsStr, OsString};
 use std::sync::OnceLock;
