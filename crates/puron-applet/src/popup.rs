@@ -4,13 +4,12 @@
 //! event loop in `app`; this module chooses no entry itself and never
 //! changes the pinned list (`puron_core::pins` does that).
 
-use cosmic::applet;
 use cosmic::iced::advanced::layout::Limits;
 use cosmic::iced::advanced::text::{self as advanced_text, Paragraph as _};
 use cosmic::iced::alignment::Vertical;
 use cosmic::iced::widget::text::Wrapping;
-use cosmic::iced::{Alignment, Length, Pixels, Size};
-use cosmic::widget::{column, container, divider, icon, row, scrollable, text, Id, Space};
+use cosmic::iced::{Alignment, Length, Padding, Pixels, Size};
+use cosmic::widget::{button, column, container, divider, icon, row, scrollable, text, Id, Space};
 use puron_core::menu::{Entry, Heading, Item, LineWord, Menu, MessageKind, Section};
 use puron_core::pins;
 use puron_core::rows::{self as core_rows, NAME_LIMIT};
@@ -29,6 +28,13 @@ pub const CHECK_SLOT: f32 = 20.0;
 pub const DEVICE_INDENT: f32 = 16.0;
 /// A line's indent from the section heading's left edge, in px.
 pub const LINE_INDENT: f32 = 24.0;
+/// The space in px at the left and at the right of every page of the
+/// popup: the temperatures, the About page and the Settings page. Each
+/// page takes it from here, so that a Settings section heading starts
+/// where the temperatures' section heading does. It is fixed instead of
+/// following the theme's density, whose spacing would give 16 px on a
+/// compact desktop and 32 px on a spacious one.
+pub const PAGE_SIDE_PADDING: u16 = 24;
 /// The popup's narrowest width in px. libcosmic's
 /// `applet::popup_container` fixes the width at this value; `limits`
 /// replaces that with the width that `width` computes.
@@ -109,6 +115,9 @@ pub struct Plan {
     pub entries: Vec<Drawn>,
     /// The side in px of a section heading's icon.
     pub icon_size: u16,
+    /// The space in px at the left and right of each entry, always
+    /// `PAGE_SIDE_PADDING`.
+    pub side_padding: u16,
 }
 
 /// What a click asks the event loop in `app` to do.
@@ -224,7 +233,11 @@ pub fn plan(menu: &Menu, pinned: &[String], icon_size: u16) -> Plan {
             },
         })
         .collect();
-    Plan { entries, icon_size }
+    Plan {
+        entries,
+        icon_size,
+        side_padding: PAGE_SIDE_PADDING,
+    }
 }
 
 /// A line's text before it is shortened: the reading's name, then the word
@@ -288,11 +301,15 @@ fn heading_text(heading: &Heading) -> String {
 }
 
 /// The popup's width in px: the width of its widest heading or line, plus
-/// libcosmic's horizontal padding of a menu entry, but never less than
-/// [`WIDTH`] or more than [`MAX_WIDTH`].
+/// the side padding at both ends, but never less than [`WIDTH`] or more
+/// than [`MAX_WIDTH`].
 pub fn width(menu: &Menu, icon_size: u16) -> f32 {
-    let padding = applet::menu_control_padding();
-    fit_width(menu, icon_size, padding.left + padding.right, &measure)
+    fit_width(
+        menu,
+        icon_size,
+        2.0 * f32::from(PAGE_SIDE_PADDING),
+        &measure,
+    )
 }
 
 /// The computation of [`width`], with the entry's horizontal padding and
@@ -363,6 +380,42 @@ pub fn element_id(index: usize, element: &str) -> Id {
     Id::new(format!("e{index}.{element}"))
 }
 
+/// The padding of one entry of a popup page: `PAGE_SIDE_PADDING` at the
+/// left and right, and the theme's `space_xxs` spacing at the top and
+/// bottom, as libcosmic's own applet menus have.
+pub fn entry_padding() -> Padding {
+    let v = f32::from(cosmic::theme::spacing().space_xxs);
+    let side = f32::from(PAGE_SIDE_PADDING);
+    Padding {
+        top: v,
+        bottom: v,
+        left: side,
+        right: side,
+    }
+}
+
+/// A clickable entry of a popup page: libcosmic's applet menu button as
+/// wide as the page, so that its hover band reaches both edges of the
+/// popup, with `content` inside the padding of `entry_padding`.
+pub fn menu_button<'a, M: Clone + 'a>(
+    content: impl Into<cosmic::Element<'a, M>>,
+) -> button::Button<'a, M> {
+    button::custom(content)
+        .class(cosmic::theme::Button::AppletMenu)
+        .padding(entry_padding())
+        .width(Length::Fill)
+}
+
+/// An entry of a popup page that answers no click: `content` inside the
+/// padding of `entry_padding`, as wide as the page.
+pub fn padded<'a, M: 'a>(
+    content: impl Into<cosmic::Element<'a, M>>,
+) -> container::Container<'a, M, cosmic::Theme, cosmic::Renderer> {
+    container(content)
+        .padding(entry_padding())
+        .width(Length::Fill)
+}
+
 fn symbolic<'a, M: 'a>(name: &'static str, size: u16) -> cosmic::Element<'a, M> {
     icon::from_name(name)
         .size(size)
@@ -373,7 +426,8 @@ fn symbolic<'a, M: 'a>(name: &'static str, size: u16) -> cosmic::Element<'a, M> 
 }
 
 /// The popup's content, built from the plan alone with libcosmic's applet
-/// menu widgets, so that it looks like COSMIC's own popups.
+/// menu widgets, so that it looks like COSMIC's own popups. Every entry
+/// has `PAGE_SIDE_PADDING` at its left and right.
 ///
 /// Each drawn entry sits in a container with the ID `entry_id(index)`.
 /// Inside it, a line's parts have the IDs of `element_id` with `check`,
@@ -420,8 +474,7 @@ pub fn view<'a>(plan: &Plan) -> cosmic::Element<'a, Clicked> {
                             .into(),
                     ])
                     .align_y(Alignment::Center);
-                    let entry =
-                        applet::menu_button(content).on_press(Clicked::Line(l.identity.clone()));
+                    let entry = menu_button(content).on_press(Clicked::Line(l.identity.clone()));
                     container(container(entry).id(entry_id(i)))
                         .padding([0.0, 0.0, 0.0, LINE_INDENT])
                         .into()
@@ -437,21 +490,17 @@ pub fn view<'a>(plan: &Plan) -> cosmic::Element<'a, Clicked> {
                     ])
                     .spacing(SECTION_GAP)
                     .align_y(Alignment::Center);
-                    container(applet::padded_control(parts))
-                        .id(entry_id(i))
-                        .into()
+                    container(padded(parts)).id(entry_id(i)).into()
                 }
                 Drawn::Device { text: t } => {
                     let label = text(t.clone()).wrapping(Wrapping::None);
-                    container(container(applet::padded_control(label)).id(entry_id(i)))
+                    container(container(padded(label)).id(entry_id(i)))
                         .padding([0.0, 0.0, 0.0, DEVICE_INDENT])
                         .into()
                 }
-                Drawn::Separator => {
-                    container(applet::padded_control(divider::horizontal::default()))
-                        .id(entry_id(i))
-                        .into()
-                }
+                Drawn::Separator => container(padded(divider::horizontal::default()))
+                    .id(entry_id(i))
+                    .into(),
                 Drawn::Message { text: t }
                 | Drawn::HomepageLink { text: t }
                 | Drawn::SettingsLink { text: t } => {
@@ -460,7 +509,7 @@ pub fn view<'a>(plan: &Plan) -> cosmic::Element<'a, Clicked> {
                         Drawn::HomepageLink { .. } => Clicked::HomepageLink,
                         _ => Clicked::SettingsLink,
                     };
-                    container(applet::menu_button(text(t.clone())).on_press(message))
+                    container(menu_button(text(t.clone())).on_press(message))
                         .id(entry_id(i))
                         .into()
                 }

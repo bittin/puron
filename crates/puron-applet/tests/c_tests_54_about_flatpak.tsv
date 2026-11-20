@@ -1,0 +1,20 @@
+back	go-previous-symbolic | Back	back
+separator		none
+name	Puron	none
+version	Version 1.6.0	none
+summary	Monitor hardware sensors	none
+field	Package | Flatpak	none
+field	License | Source code: MIT | Applet program as distributed: GPL-3.0-only	none
+field	Copyright | © 2026 Eric Lalonde	none
+heading	Sensor sources	none
+source	lm-sensors | available | 12	none
+source	NVMe | available | 2	none
+source	NVIDIA | not available	none
+source	udisks2 | available | 1	none
+source	liquidctl | not available in the Flatpak	none
+heading	Links	none
+link	Homepage	link https://elalonde.dev/projects/puron/
+link	Source code	link https://github.com/elalonde/puron
+link	Report a problem	link https://github.com/elalonde/puron/issues
+link	Third-party notices	link https://github.com/elalonde/puron/blob/v1.6.0/README.md#license
+copy	Copy details	copy

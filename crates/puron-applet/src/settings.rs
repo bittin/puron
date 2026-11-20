@@ -15,7 +15,6 @@
 //! made by another program is, so a change is never applied twice and a
 //! store that fails is never applied.
 
-use cosmic::applet;
 use cosmic::iced::{Alignment, Length};
 use cosmic::widget::{
     button, column, container, divider, dropdown, icon, row, scrollable, settings, text,
@@ -27,7 +26,8 @@ use puron_core::settings::{
 };
 
 use crate::about::BACK_ICON;
-use crate::popup::{Event, Reply};
+use crate::look;
+use crate::popup::{menu_button, padded, Event, Reply, PAGE_SIDE_PADDING};
 
 /// The icon name of the number field's − button.
 pub const MINUS_ICON: &str = "list-remove-symbolic";
@@ -109,6 +109,9 @@ pub enum Entry {
 #[derive(Clone, Debug, PartialEq)]
 pub struct Plan {
     pub entries: Vec<Entry>,
+    /// The space in px at the left and right of the page, always
+    /// `popup::PAGE_SIDE_PADDING`.
+    pub side_padding: u16,
 }
 
 impl Plan {
@@ -554,7 +557,10 @@ pub fn plan(input: &Input) -> Plan {
             items,
         }));
     }
-    Plan { entries }
+    Plan {
+        entries,
+        side_padding: PAGE_SIDE_PADDING,
+    }
 }
 
 /// The answer to a message of the page. Every message leaves the popup
@@ -576,8 +582,9 @@ pub fn clicked(_plan: &Plan, clicked: Clicked) -> Reply {
 /// `item-<N>` (N is the item number, from 1), `control-<N>`, `section-<N>`,
 /// `minus` and `plus` are containers with no padding around the item row,
 /// its control, the section and the number field's two buttons, so they
-/// add nothing to the layout. `back` holds "Back", `separator` the line
-/// under it, `scroll` is the scroll area, `input` the number field's text
+/// add nothing to the layout. `back` holds "Back" and `back-icon` its
+/// icon, `separator` the line under it, `content` everything below that
+/// line, `scroll` is the scroll area, `input` the number field's text
 /// input and `notice` the line that reports a failed store.
 pub fn id(name: impl Into<String>) -> Id {
     Id::new(name.into())
@@ -652,15 +659,17 @@ fn control<'a>(n: usize, c: &'a Kind) -> cosmic::Element<'a, Clicked> {
     container(widget).id(id(format!("control-{n}"))).into()
 }
 
-/// The page's content, drawn from `plan`: "Back", the separator and the
-/// notice, then the sections in one column, all inside one scroll area so
-/// that "Back" scrolls with the page. Each section is a libcosmic settings
-/// section and each item a settings item row, with libcosmic's own
-/// spacing and padding; a label too long for its row wraps.
+/// The page's content, drawn from `plan`: "Back" and the separator, as
+/// wide as the popup like the temperatures' entries, then the notice and
+/// the sections in one column between the two side paddings, all inside
+/// one scroll area so that "Back" scrolls with the page. Each section is
+/// a libcosmic settings section and each item a settings item row; a
+/// label too long for its row wraps.
 pub fn view<'a>(plan: &'a Plan) -> cosmic::Element<'a, Clicked> {
     let mut n = 0;
     let mut s = 0;
     let mut children: Vec<cosmic::Element<'a, Clicked>> = Vec::new();
+    let mut below: Vec<cosmic::Element<'a, Clicked>> = Vec::new();
     let mut sections: Vec<cosmic::Element<'a, Clicked>> = Vec::new();
     for e in &plan.entries {
         match e {
@@ -669,22 +678,24 @@ pub fn view<'a>(plan: &'a Plan) -> cosmic::Element<'a, Clicked> {
                 text: t,
             } => {
                 let parts = row::with_children(vec![
-                    icon::from_name(*name).size(16).symbolic(true).icon().into(),
+                    container(icon::from_name(*name).size(16).symbolic(true).icon())
+                        .id(id("back-icon"))
+                        .into(),
                     text(t.as_str()).into(),
                 ])
                 .spacing(8)
                 .align_y(Alignment::Center);
-                let back = applet::menu_button(parts).on_press(Clicked::Back);
+                let back = menu_button(parts).on_press(Clicked::Back);
                 children.push(container(back).id(id("back")).width(Length::Fill).into());
             }
             Entry::Separator => children.push(
-                container(applet::padded_control(divider::horizontal::default()))
+                container(padded(divider::horizontal::default()))
                     .id(id("separator"))
                     .width(Length::Fill)
                     .into(),
             ),
-            Entry::Notice(t) => children.push(
-                container(applet::padded_control(text(t.as_str()).width(Length::Fill)))
+            Entry::Notice(t) => below.push(
+                container(text(t.as_str()).width(Length::Fill))
                     .id(id("notice"))
                     .width(Length::Fill)
                     .into(),
@@ -714,7 +725,15 @@ pub fn view<'a>(plan: &'a Plan) -> cosmic::Element<'a, Clicked> {
             }
         }
     }
-    children.push(settings::view_column(sections).into());
+    below.push(settings::view_column(sections).into());
+    let space = cosmic::theme::spacing().space_m;
+    children.push(
+        container(column::with_children(below).spacing(space))
+            .id(id("content"))
+            .padding(look::content_padding())
+            .width(Length::Fill)
+            .into(),
+    );
     scrollable(column::with_children(children).width(Length::Fill))
         .id(id("scroll"))
         .width(Length::Fill)

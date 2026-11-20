@@ -1,0 +1,27 @@
+back	go-previous-symbolic | Back	back
+separator		none
+section	Display Options	none
+item 1	Poll Sensors Every (sec)	typed, enter, focus lost, plus, minus poll_interval_secs
+item 2	Show Icon on Panel	switch show_panel_icons
+item 3	Panel Text Size | Text size when Puron is on a panel | Match panel size | 10 px | 12 px | 14 px | 16 px | 18 px | 20 px | 24 px	list panel_text_size
+item 4	Dock Text Size | Text size when Puron is on a dock | Match dock size | 10 px | 12 px | 14 px | 16 px | 18 px | 20 px | 24 px	list dock_text_size
+item 5	Temperature Unit | °C | °F	list temperature_unit
+item 6	Show Temperature Unit	switch show_temperature_unit
+item 7	Show Rotation Rate Unit	switch show_rotation_rate_unit
+item 8	Show Voltage Unit	switch show_voltage_unit
+item 9	Show Power Unit	switch show_power_unit
+item 10	Show Decimal Values | Show additional digits after decimal point	switch show_decimals
+section	Generic Sensor Providers	none
+item 11	lm-sensors | Read sensors from lm-sensors	switch provider_lm_sensors
+item 12	liquidctl | Read sensors from liquidctl (requires v1.7.0 or later)	switch provider_liquidctl
+section	GPU Sensor Providers	none
+item 13	Nvidia	switch provider_nvidia
+section	Drive Sensor Providers	none
+item 14	lm-sensors (drives only) | Read drive temperatures from lm-sensors	switch provider_lm_sensors_drives
+item 15	Udisks2	switch provider_udisks2
+item 16	nvme-cli	switch provider_nvme
+section	Show Sensors	none
+item 17	Temperature	switch show_temperature
+item 18	Rotation Rate	switch show_rotation_rate
+item 19	Voltage	switch show_voltage
+item 20	Power	switch show_power

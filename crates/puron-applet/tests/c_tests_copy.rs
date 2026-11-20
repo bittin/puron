@@ -359,3 +359,68 @@ fn c_tests_47() {
         assert_eq!(a.page(), Page::About);
     });
 }
+
+/// The last entry of the About plan of version 1.6.0, the Debian package
+/// and the source set `all` is "Copy details" drawn as libcosmic's accent
+/// button. Drawn at the narrowest and the widest popup, the button reaches
+/// from 24 px right of the popup's left edge to 24 px left of its right
+/// edge, and its text is centered in it within 1 px.
+#[test]
+fn c_tests_53() {
+    use cosmic::iced::Size;
+    use cosmic::widget::{container, Id};
+    use iced_test::{selector, Simulator};
+    use puron_applet::popup;
+
+    puron_testkit::limit("C-tests-53", 5, || {
+        puron_applet::start();
+        let plan = about::plan(&about::Input {
+            version: "1.6.0".to_string(),
+            package: Package::Deb,
+            sources: [
+                Source::Available(12),
+                Source::Available(2),
+                Source::NotAvailable,
+                Source::Available(1),
+                Source::NotAvailable,
+            ],
+        });
+        let last = plan.entries.len() - 1;
+        assert_eq!(
+            plan.entries[last],
+            Entry::Copy {
+                text: "Copy details".to_string()
+            }
+        );
+        assert_eq!(plan.looks[last].press, Some(about::Press::Suggested));
+        for width in [popup::WIDTH, popup::MAX_WIDTH] {
+            let root = container(about::view(&plan)).id(Id::new("root"));
+            let mut sim: Simulator<'_, Clicked, cosmic::Theme, cosmic::Renderer> =
+                Simulator::with_size(Default::default(), Size::new(width, 1000.0), root);
+            let mut find = |id: Id| {
+                sim.find(selector::id(id.clone()))
+                    .unwrap_or_else(|e| panic!("find {id:?}: {e:?}"))
+                    .bounds()
+            };
+            let root = find(Id::new("root"));
+            let button = find(popup::entry_id(last));
+            let text = find(popup::element_id(last, "text"));
+            let side = f32::from(popup::PAGE_SIDE_PADDING);
+            assert!(
+                (button.x - (root.x + side)).abs() <= 0.5,
+                "width {width}: button starts at {}",
+                button.x
+            );
+            assert!(
+                (button.x + button.width - (root.x + root.width - side)).abs() <= 0.5,
+                "width {width}: button ends at {}",
+                button.x + button.width
+            );
+            let mid = |r: cosmic::iced::Rectangle| r.x + r.width / 2.0;
+            assert!(
+                (mid(text) - mid(button)).abs() <= 1.0,
+                "width {width}: text {text:?} not centered in {button:?}"
+            );
+        }
+    });
+}

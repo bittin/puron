@@ -7,6 +7,7 @@ pub mod i18n;
 pub mod about;
 pub mod app;
 pub mod copy;
+pub mod look;
 pub mod panel;
 pub mod popup;
 pub mod settings;

@@ -4,16 +4,17 @@
 //! the page drawn from them. The page is the popup's second page: the
 //! entry "About" of the temperatures shows it, and its "Back" returns.
 
-use cosmic::applet;
+use cosmic::iced::alignment::{Horizontal, Vertical};
 use cosmic::iced::{Alignment, Length};
-use cosmic::widget::{button, column, container, divider, icon, row, scrollable, text};
+use cosmic::widget::{button, column, container, divider, row, scrollable, Id, Space};
 use puron_core::menu::HOMEPAGE_URL;
 use puron_core::rows::Provider;
 use puron_core::settings::Settings;
 use puron_engine::engine::{ProviderState, Snapshot};
 use puron_engine::registry;
 
-use crate::popup::{entry_id, Event, Reply};
+use crate::look::{self, Role, TextStyle};
+use crate::popup::{element_id, entry_id, menu_button, padded, Event, Reply, PAGE_SIDE_PADDING};
 
 /// The kind of package that this program was built for. The build sets
 /// it (`make install` with `PACKAGE`); the program never tests at run
@@ -176,9 +177,177 @@ pub enum Entry {
 }
 
 /// The About page as plain data, which `view` draws and tests read.
+/// `looks` holds the look of each entry, at the same index as the entry.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Plan {
     pub entries: Vec<Entry>,
+    pub looks: Vec<Look>,
+    /// The space in px at the left and right of the page, always
+    /// `popup::PAGE_SIDE_PADDING`.
+    pub side_padding: u16,
+}
+
+/// The icon at the right of each link: an arrow up and to the right, the
+/// usual sign for a link that opens outside the popup.
+pub const LINK_ICON: &str = "insert-arrow-symbolic";
+
+/// Where an entry of the About page sits.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Place {
+    /// A full-width entry like those of the temperatures: "Back" and the
+    /// separator.
+    Row,
+    /// The centered block of the name, the version and the summary.
+    Header,
+    /// The card that holds the package, license and copyright fields.
+    CardFacts,
+    /// The card that holds the sensor sources.
+    CardSources,
+    /// The card that holds the links.
+    CardLinks,
+    /// On the page itself, outside any card: the two headings and the
+    /// "Copy details" button.
+    Page,
+}
+
+/// How an entry's content lies across its place.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Align {
+    Start,
+    Center,
+}
+
+/// The kind of button that a clickable entry is.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Press {
+    /// libcosmic's applet menu button, as wide as the popup.
+    Menu,
+    /// A button with no background, in the class of libcosmic's links.
+    Link,
+    /// libcosmic's accent button, the class of `button::suggested`.
+    Suggested,
+}
+
+/// How one entry of the About page is drawn.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Look {
+    pub place: Place,
+    pub align: Align,
+    /// The style and color role of each of the entry's texts, in this
+    /// order: a field's label, then each of its values; a source's name,
+    /// its state text and its count (an empty text unless it is
+    /// available); for any other entry its one text. The separator has
+    /// none.
+    pub texts: Vec<(TextStyle, Role)>,
+    /// The icon the entry draws, with its color role.
+    pub icon: Option<(&'static str, Role)>,
+    /// The kind of button, for an entry that answers a click.
+    pub press: Option<Press>,
+}
+
+/// The color role of the state text of the source at `index` of
+/// `SOURCES`: green when it is available, the warning color for liquidctl
+/// in the Flatpak, grey when it is off or not available.
+pub fn state_role(package: Package, index: usize, source: Source) -> Role {
+    if flatpak_liquidctl(package, index, source) {
+        return Role::Warning;
+    }
+    match source {
+        Source::Available(_) => Role::Success,
+        Source::Off | Source::NotAvailable => Role::Muted,
+    }
+}
+
+/// The look of each of `entries`, the About entries of `input`.
+fn looks(entries: &[Entry], input: &Input) -> Vec<Look> {
+    let body = |role| (TextStyle::Body, role);
+    let mut source = 0;
+    entries
+        .iter()
+        .map(|e| {
+            let (place, align, texts, icon, press) = match e {
+                Entry::Back { icon, .. } => (
+                    Place::Row,
+                    Align::Start,
+                    vec![body(Role::Default)],
+                    Some((*icon, Role::Default)),
+                    Some(Press::Menu),
+                ),
+                Entry::Separator => (Place::Row, Align::Start, vec![], None, None),
+                Entry::Name(_) => (
+                    Place::Header,
+                    Align::Center,
+                    vec![(TextStyle::Title3, Role::Default)],
+                    None,
+                    None,
+                ),
+                Entry::Version(_) => (
+                    Place::Header,
+                    Align::Center,
+                    vec![body(Role::Default)],
+                    None,
+                    None,
+                ),
+                Entry::Summary(_) => (
+                    Place::Header,
+                    Align::Center,
+                    vec![body(Role::Muted)],
+                    None,
+                    None,
+                ),
+                Entry::Field { values, .. } => {
+                    let mut texts = vec![body(Role::Muted)];
+                    texts.extend(values.iter().map(|_| body(Role::Default)));
+                    (Place::CardFacts, Align::Start, texts, None, None)
+                }
+                Entry::Heading(_) => (
+                    Place::Page,
+                    Align::Start,
+                    vec![(TextStyle::CaptionHeading, Role::Muted)],
+                    None,
+                    None,
+                ),
+                Entry::Source { .. } => {
+                    let role = state_role(input.package, source, input.sources[source]);
+                    source += 1;
+                    (
+                        Place::CardSources,
+                        Align::Start,
+                        vec![
+                            body(Role::Default),
+                            body(role),
+                            (TextStyle::Heading, Role::Default),
+                        ],
+                        None,
+                        None,
+                    )
+                }
+                Entry::Link { .. } => (
+                    Place::CardLinks,
+                    Align::Start,
+                    vec![body(Role::Accent)],
+                    Some((LINK_ICON, Role::Accent)),
+                    Some(Press::Link),
+                ),
+                // The accent button gives its text the theme's color for
+                // text on the accent, so the text sets none of its own.
+                Entry::Copy { .. } => (
+                    Place::Page,
+                    Align::Center,
+                    vec![body(Role::Default)],
+                    None,
+                    Some(Press::Suggested),
+                ),
+            };
+            Look {
+                place,
+                align,
+                texts,
+                icon,
+                press,
+            }
+        })
+        .collect()
 }
 
 /// The About page's entries for `input`, in the page's order. The texts
@@ -244,7 +413,11 @@ pub fn plan(input: &Input) -> Plan {
     entries.push(Entry::Copy {
         text: fl!("about-copy"),
     });
-    Plan { entries }
+    Plan {
+        looks: looks(&entries, input),
+        entries,
+        side_padding: PAGE_SIDE_PADDING,
+    }
 }
 
 /// The widget message of a click on the About page.
@@ -279,79 +452,226 @@ pub fn clicked(plan: &Plan, clicked: Clicked) -> Reply {
     Reply { event, close }
 }
 
-/// The page's content, built from the plan alone with libcosmic's applet
-/// widgets, so that it looks like the temperatures. Each entry sits in a
-/// container with the ID `popup::entry_id(index)`. Texts wrap instead of
-/// being cut, and content taller than the popup scrolls.
-pub fn view<'a>(plan: &Plan) -> cosmic::Element<'a, Clicked> {
-    let children: Vec<cosmic::Element<'a, Clicked>> = plan
-        .entries
-        .iter()
-        .enumerate()
-        .map(|(i, e)| -> cosmic::Element<'a, Clicked> {
-            let content: cosmic::Element<'a, Clicked> = match e {
-                Entry::Back {
-                    icon: name,
-                    text: t,
-                } => {
-                    let parts = row::with_children(vec![
-                        icon::from_name(*name).size(16).symbolic(true).icon().into(),
-                        text(t.clone()).into(),
-                    ])
-                    .spacing(8)
-                    .align_y(Alignment::Center);
-                    applet::menu_button(parts).on_press(Clicked::Back).into()
-                }
-                Entry::Separator => applet::padded_control(divider::horizontal::default()).into(),
-                Entry::Name(t) => applet::padded_control(text::title3(t.clone())).into(),
-                Entry::Version(t) | Entry::Summary(t) => {
-                    applet::padded_control(text(t.clone()).width(Length::Fill)).into()
-                }
-                Entry::Field { label, values } => {
-                    let values = column::with_children(
-                        values
-                            .iter()
-                            .map(|v| text(v.clone()).width(Length::Fill).into())
-                            .collect::<Vec<cosmic::Element<'a, Clicked>>>(),
-                    )
-                    .width(Length::FillPortion(2));
-                    let parts = row::with_children(vec![
-                        text::heading(label.clone())
-                            .width(Length::FillPortion(1))
-                            .into(),
-                        values.into(),
-                    ])
-                    .spacing(8);
-                    applet::padded_control(parts).into()
-                }
-                Entry::Heading(t) => {
-                    applet::padded_control(text::heading(t.clone()).width(Length::Fill)).into()
-                }
-                Entry::Source { name, state, count } => {
-                    let count = count.map(|n| n.to_string()).unwrap_or_default();
-                    let parts = row::with_children(vec![
-                        text(*name).width(Length::FillPortion(1)).into(),
-                        text(state.clone()).width(Length::FillPortion(2)).into(),
-                        text(count).into(),
-                    ])
-                    .spacing(8);
-                    applet::padded_control(parts).into()
-                }
-                Entry::Link { text: t, url } => {
-                    applet::menu_button(text(t.clone()).width(Length::Fill))
-                        .on_press(Clicked::Link(url.clone()))
-                        .into()
-                }
-                Entry::Copy { text: t } => {
-                    applet::padded_control(button::standard(t.clone()).on_press(Clicked::Copy))
-                        .into()
-                }
+/// The width in px of a field's label column on the About page.
+const LABEL_WIDTH: f32 = 92.0;
+/// The width in px of a source's name column.
+const SOURCE_NAME_WIDTH: f32 = 82.0;
+/// The width in px of a source's count column, at whose right edge the
+/// count ends.
+const COUNT_WIDTH: f32 = 28.0;
+/// The space in px between the blocks below the separator: the header,
+/// each card with its heading, and the button.
+const BLOCK_GAP: f32 = 16.0;
+/// The space in px between a heading and the card under it.
+const HEADING_GAP: f32 = 6.0;
+
+/// The widget ID of the card at `place`: `card-facts`, `card-sources` or
+/// `card-links`, so that tests can find its rectangle. Any other place has
+/// no card and gets `card-none`.
+pub fn card_id(place: Place) -> Id {
+    Id::new(match place {
+        Place::CardFacts => "card-facts",
+        Place::CardSources => "card-sources",
+        Place::CardLinks => "card-links",
+        _ => "card-none",
+    })
+}
+
+/// The text at index `n` of `look.texts`, drawn in its style and role.
+fn styled_text<'a>(content: String, look: &Look, n: usize) -> cosmic::Element<'a, Clicked> {
+    let (style, role) = look
+        .texts
+        .get(n)
+        .copied()
+        .unwrap_or((TextStyle::Body, Role::Default));
+    look::styled(content, style, role)
+}
+
+/// The widgets of entry `i`, without the container that carries its ID.
+/// A text that tests measure sits in a container with the ID
+/// `popup::element_id(i, part)`: Back's and a link's `icon`, a link's,
+/// the header's, a heading's and the button's `text`, a field's `label`,
+/// and a source's `state` and `count`.
+fn entry_view<'a>(i: usize, e: &Entry, look: &Look) -> cosmic::Element<'a, Clicked> {
+    let part = |content: cosmic::Element<'a, Clicked>, name: &str| {
+        container(content).id(element_id(i, name))
+    };
+    let icon_of = |size| {
+        look.icon
+            .map(|(name, role)| look::tinted_icon(name, size, role))
+            .unwrap_or_else(|| Space::new().into())
+    };
+    match e {
+        Entry::Back { text: t, .. } => {
+            let parts = row::with_children(vec![
+                part(icon_of(16), "icon").into(),
+                styled_text(t.clone(), look, 0),
+            ])
+            .spacing(8)
+            .align_y(Alignment::Center);
+            menu_button(parts).on_press(Clicked::Back).into()
+        }
+        Entry::Separator => padded(divider::horizontal::default()).into(),
+        Entry::Name(t) | Entry::Version(t) | Entry::Summary(t) | Entry::Heading(t) => {
+            let horizontal = match look.align {
+                Align::Center => Horizontal::Center,
+                Align::Start => Horizontal::Left,
             };
-            container(content)
-                .id(entry_id(i))
+            container(part(styled_text(t.clone(), look, 0), "text"))
                 .width(Length::Fill)
+                .align_x(horizontal)
                 .into()
-        })
-        .collect();
-    scrollable(column::with_children(children).width(Length::Fill)).into()
+        }
+        Entry::Field { label, values } => {
+            let values = column::with_children(
+                values
+                    .iter()
+                    .enumerate()
+                    .map(|(n, v)| styled_text(v.clone(), look, n + 1))
+                    .collect::<Vec<cosmic::Element<'a, Clicked>>>(),
+            )
+            .spacing(4)
+            .width(Length::Fill);
+            row::with_children(vec![
+                part(styled_text(label.clone(), look, 0), "label")
+                    .width(Length::Fixed(LABEL_WIDTH))
+                    .into(),
+                values.into(),
+            ])
+            .spacing(10)
+            .into()
+        }
+        Entry::Source { name, state, count } => {
+            let count = count.map(|n| n.to_string()).unwrap_or_default();
+            let parts = row::with_children(vec![
+                container(styled_text(name.to_string(), look, 0))
+                    .width(Length::Fixed(SOURCE_NAME_WIDTH))
+                    .into(),
+                container(part(styled_text(state.clone(), look, 1), "state"))
+                    .width(Length::Fill)
+                    .into(),
+                container(part(styled_text(count, look, 2), "count"))
+                    .width(Length::Fixed(COUNT_WIDTH))
+                    .align_x(Horizontal::Right)
+                    .into(),
+            ])
+            .spacing(8)
+            .align_y(Alignment::Center);
+            container(parts).padding([6.0, 0.0]).into()
+        }
+        Entry::Link { text: t, url } => {
+            let parts = row::with_children(vec![
+                part(styled_text(t.clone(), look, 0), "text")
+                    .width(Length::Fill)
+                    .into(),
+                part(icon_of(16), "icon").into(),
+            ])
+            .spacing(8)
+            .align_y(Alignment::Center);
+            button::custom(parts)
+                .class(cosmic::theme::Button::Link)
+                .padding([10.0, 14.0])
+                .width(Length::Fill)
+                .on_press(Clicked::Link(url.clone()))
+                .into()
+        }
+        // libcosmic's `button::suggested` puts its label at the left of a
+        // wide button, so the button is built from the same class with
+        // the label centered in it.
+        Entry::Copy { text: t } => {
+            let space = cosmic::theme::spacing();
+            let label = container(part(styled_text(t.clone(), look, 0), "text"))
+                .width(Length::Fill)
+                .height(Length::Fill)
+                .align_x(Horizontal::Center)
+                .align_y(Vertical::Center);
+            button::custom(label)
+                .class(cosmic::theme::Button::Suggested)
+                .padding([0.0, f32::from(space.space_s)])
+                .width(Length::Fill)
+                .height(Length::Fixed(f32::from(space.space_l)))
+                .on_press(Clicked::Copy)
+                .into()
+        }
+    }
+}
+
+/// The page's content, built from the plan alone with libcosmic's
+/// widgets. "Back" and the separator are full-width entries like those of
+/// the temperatures. Below them, between the two side paddings, come the
+/// centered header, the card of the facts, the heading "Sensor sources"
+/// with its card, the heading "Links" with its card, and the button.
+///
+/// Each entry sits in a container with the ID `popup::entry_id(index)`,
+/// and each card has the ID of `card_id`. Texts wrap instead of being
+/// cut, and content taller than the popup scrolls.
+pub fn view<'a>(plan: &Plan) -> cosmic::Element<'a, Clicked> {
+    // The entries in runs of the same place, in order; each entry on the
+    // page itself is a run of its own, marked when it is a heading.
+    let mut runs: Vec<(Place, bool, Vec<cosmic::Element<'a, Clicked>>)> = Vec::new();
+    for (i, (e, look)) in plan.entries.iter().zip(&plan.looks).enumerate() {
+        let entry: cosmic::Element<'a, Clicked> = container(entry_view(i, e, look))
+            .id(entry_id(i))
+            .width(Length::Fill)
+            .into();
+        match runs.last_mut() {
+            Some((place, _, run)) if *place == look.place && look.place != Place::Page => {
+                run.push(entry)
+            }
+            _ => runs.push((look.place, matches!(e, Entry::Heading(_)), vec![entry])),
+        }
+    }
+    let mut rows: Vec<cosmic::Element<'a, Clicked>> = Vec::new();
+    let mut blocks: Vec<cosmic::Element<'a, Clicked>> = Vec::new();
+    // A heading waits here for the card that follows it, so that the two
+    // form one block with the smaller gap between them.
+    let mut heading: Option<cosmic::Element<'a, Clicked>> = None;
+    for (place, is_heading, run) in runs {
+        let block: cosmic::Element<'a, Clicked> = match place {
+            Place::Row => {
+                rows.extend(run);
+                continue;
+            }
+            Place::Header => column::with_children(run)
+                .spacing(2)
+                .width(Length::Fill)
+                .into(),
+            Place::CardFacts => look::card(column::with_children(run).spacing(6), [12.0, 14.0])
+                .id(card_id(place))
+                .into(),
+            Place::CardSources => look::card(column::with_children(run), [6.0, 14.0])
+                .id(card_id(place))
+                .into(),
+            Place::CardLinks => look::card(column::with_children(run), [4.0, 0.0])
+                .id(card_id(place))
+                .into(),
+            Place::Page => {
+                let entry = column::with_children(run).width(Length::Fill).into();
+                if is_heading {
+                    blocks.extend(heading.replace(entry));
+                    continue;
+                }
+                entry
+            }
+        };
+        match heading.take() {
+            Some(h) => blocks.push(
+                column::with_children(vec![h, block])
+                    .spacing(HEADING_GAP)
+                    .width(Length::Fill)
+                    .into(),
+            ),
+            None => blocks.push(block),
+        }
+    }
+    blocks.extend(heading);
+    let content = container(
+        column::with_children(blocks)
+            .spacing(BLOCK_GAP)
+            .width(Length::Fill),
+    )
+    .padding(look::content_padding())
+    .width(Length::Fill);
+    rows.push(content.into());
+    scrollable(column::with_children(rows).width(Length::Fill)).into()
 }
