@@ -68,16 +68,23 @@ archive, `puron-<version>-source.tar.xz`.
 - When Puron finds no readings, the popup says so: it asks you to
   install lm-sensors, or to run `sensors-detect` (part of the lm-sensors
   package) as root, which sets up the sensor chips of your computer.
-- At the bottom of the popup, "Settings" opens the settings window,
-  and "About" opens the Puron homepage in your browser.
+- At the bottom of the popup, "Settings" shows the settings on a page of
+  the popup, and "Back" on that page shows the readings again. "About"
+  shows the About page in the popup: the version of Puron, how it was
+  packaged, its license, the state of each source of readings, and links
+  to the homepage, the source code, the issue tracker and the
+  third-party notices, with a button "Copy details" that copies these
+  facts for a bug report.
 
-The settings window holds the following settings. Changes take effect
-at once.
+The Settings page holds the following settings. Changes take effect at
+once.
 
 - Display Options: how often Puron reads the sensors (in seconds),
-  whether the panel shows an icon next to each reading, the temperature
-  unit (°C or °F), whether to show the unit of temperatures, rotation
-  rates, voltages and power, and whether to show decimals.
+  whether the panel shows an icon next to each reading, the text size of
+  the readings when Puron is on a panel ("Panel Text Size") and when it
+  is on a dock ("Dock Text Size"), the temperature unit (°C or °F),
+  whether to show the unit of temperatures, rotation rates, voltages and
+  power, and whether to show decimals.
 - Generic, GPU and Drive Sensor Providers: switch each source of
   readings on or off: lm-sensors and liquidctl, the NVIDIA driver, and
   udisks2 and NVMe for drives. The NVMe switch is labelled "nvme-cli";
