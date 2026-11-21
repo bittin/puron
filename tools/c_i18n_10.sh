@@ -5,5 +5,6 @@
 cd "$(dirname "$0")/.." || exit 2
 got=$(find i18n -name '*.ftl' | LC_ALL=C sort)
 printf '%s\n' "$got"
-if [ "$got" = i18n/en/puron.ftl ]; then echo "C-i18n-10: ok"; exit 0; fi
-echo "C-i18n-10: FAIL (expected exactly i18n/en/puron.ftl)"; exit 1
+if [ "$got" = 'i18n/en/puron.ftl
+i18n/sv/puron.ftl' ]; then echo "C-i18n-10: ok"; exit 0; fi
+echo "C-i18n-10: FAIL (expected exactly i18n/en/puron.ftl\ni18n/sv/puron.ftl)"; exit 1
