@@ -214,7 +214,7 @@ pub fn plan(menu: &Menu, pinned: &[String], icon_size: u16) -> Plan {
                 icon: section_icon_name(*section),
                 text: section_text(*section),
             },
-            Entry::Device(heading) => Drawn::Device {
+            Entry::Device(heading, _) => Drawn::Device {
                 text: heading_text(heading),
             },
             Entry::Line(item) => Drawn::Line(line_of(item, pinned)),

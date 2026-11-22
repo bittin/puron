@@ -180,7 +180,7 @@ fn c_applet_popup_1() {
             match (e, d) {
                 (menu::Entry::Line(it), Drawn::Line(l)) => assert_eq!(l.identity, it.identity),
                 (menu::Entry::Section(_), Drawn::Section { .. })
-                | (menu::Entry::Device(_), Drawn::Device { .. })
+                | (menu::Entry::Device(..), Drawn::Device { .. })
                 | (menu::Entry::Separator, Drawn::Separator)
                 | (menu::Entry::HomepageLink { .. }, Drawn::HomepageLink { .. })
                 | (menu::Entry::SettingsLink, Drawn::SettingsLink { .. }) => {}

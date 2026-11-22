@@ -211,6 +211,51 @@ pub enum Section {
     Power,
 }
 
+/// How hot a temperature line runs; the popup colors the line's value by
+/// it. The level is decided on the value in °C before it is formatted, so
+/// a line is as warm in Fahrenheit as in Celsius.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Heat {
+    Normal,
+    Warm,
+    Hot,
+}
+
+/// The temperatures in °C from which a CPU or GPU line is warm, and from
+/// which it is hot. A CPU under an ordinary load runs well above the
+/// limits of the other devices, so it has limits of its own.
+pub const HEAT_CPU_GPU_WARM: f64 = 75.0;
+pub const HEAT_CPU_GPU_HOT: f64 = 90.0;
+/// The limits of a drive, which wears out at temperatures that a CPU
+/// takes in its stride.
+pub const HEAT_DRIVE_WARM: f64 = 55.0;
+pub const HEAT_DRIVE_HOT: f64 = 70.0;
+/// The limits of every other device: a Wi-Fi or wired network card, a
+/// memory module, and any device that Puron does not tell apart.
+pub const HEAT_OTHER_WARM: f64 = 60.0;
+pub const HEAT_OTHER_HOT: f64 = 80.0;
+
+/// The heat level of a line of icon kind `kind` with `value` in °C. A value
+/// equal to a limit is at that limit's level. A line with no value and a
+/// fan, voltage or power line are always normal: the limits are
+/// temperatures.
+fn heat(kind: IconKind, value: Option<f64>) -> Heat {
+    use IconKind::*;
+    let (warm, hot) = match kind {
+        CpuTemperature | GpuTemperature => (HEAT_CPU_GPU_WARM, HEAT_CPU_GPU_HOT),
+        DriveTemperature => (HEAT_DRIVE_WARM, HEAT_DRIVE_HOT),
+        GeneralTemperature | WifiTemperature | WiredNetworkTemperature | MemoryTemperature => {
+            (HEAT_OTHER_WARM, HEAT_OTHER_HOT)
+        }
+        Fan | Voltage | Power => return Heat::Normal,
+    };
+    match value {
+        Some(v) if v >= hot => Heat::Hot,
+        Some(v) if v >= warm => Heat::Warm,
+        _ => Heat::Normal,
+    }
+}
+
 /// A line of the popup layout, with its value as text; `value` is `None`
 /// when the line has no value.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -223,13 +268,20 @@ pub struct Item {
     pub word: Option<LineWord>,
     pub default: bool,
     pub value: Option<Text>,
+    /// The icon kind of the line (see [`icon_kind`]).
+    pub kind: IconKind,
+    /// How hot the line runs, from its value before formatting.
+    pub heat: Heat,
 }
 
 /// One entry of the popup layout (`Menu::entries`).
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Entry {
     Section(Section),
-    Device(Heading),
+    /// A device's heading, with the icon kind that the device's lines
+    /// share (see [`maximum_kind`]), so the popup can show the device's
+    /// icon beside its name.
+    Device(Heading, IconKind),
     Line(Item),
     Separator,
     /// The message shown when there are no lines, with the homepage.
@@ -640,6 +692,10 @@ fn waiting_item(pin: &str) -> Item {
         word: Some(LineWord::Waiting),
         default: false,
         value: None,
+        // The line sits in the CPU group, so it takes the CPU's kind; with
+        // no value it has no heat.
+        kind: IconKind::CpuTemperature,
+        heat: Heat::Normal,
     }
 }
 
@@ -699,7 +755,8 @@ pub fn menu_with(
         if !groups.is_empty() {
             entries.push(Entry::Section(Section::Temperature));
             for (heading, items) in groups {
-                entries.push(Entry::Device(heading));
+                let kinds: Vec<IconKind> = items.iter().map(|i| i.kind).collect();
+                entries.push(Entry::Device(heading, maximum_kind(&kinds)));
                 entries.extend(items.into_iter().map(Entry::Line));
             }
         }
@@ -748,6 +805,8 @@ fn item(line: &ShownLine, settings: &Settings) -> Item {
         word: line.word,
         default: line.default,
         value: format(line.class, line.value, settings),
+        kind: line.kind,
+        heat: heat(line.kind, line.value),
     }
 }
 

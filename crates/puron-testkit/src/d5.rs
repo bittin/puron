@@ -208,7 +208,7 @@ pub fn lines(snapshot: Option<&Snapshot>, settings: &Settings) -> String {
                 "-",
                 "-",
             ),
-            Entry::Device(heading) => {
+            Entry::Device(heading, _) => {
                 let name = match heading {
                     Heading::Cpu => menu::CPU_HEADING,
                     Heading::Name(name) => name,

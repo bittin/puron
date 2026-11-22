@@ -1,7 +1,8 @@
 //! Tests of the popup's lines and layout (`menu`). Each test must finish
 //! within 2 seconds (`puron_testkit::limit`). The fixtures are under
 //! crates/puron-testkit/fixtures/raw/ (capture.json, summary.json,
-//! menu.json, rebuild.json, cpu.json, drives.json). Unless a test says
+//! menu.json, rebuild.json, cpu.json, drives.json, icons.json,
+//! heat.json). Unless a test says
 //! otherwise, the settings are the defaults, lm-sensors has completed a
 //! read (`Report::Answered`), and no rebuild is forced.
 
@@ -9,7 +10,8 @@ use std::collections::BTreeMap;
 
 use puron_core::format::{Text, Unit};
 use puron_core::menu::{
-    self, Entry, Heading, IconKind, Item, Key, LineWord, Menu, MessageKind, Report, Section, Update,
+    self, Entry, Heading, Heat, IconKind, Item, Key, LineWord, Menu, MessageKind, Report, Section,
+    Update,
 };
 use puron_core::rows::{Kind, Provider, RawReading};
 use puron_core::settings::{Settings, TemperatureUnit};
@@ -132,8 +134,8 @@ fn render(m: &Menu) -> Vec<String> {
             Entry::Section(Section::Fan) => "# fan".to_string(),
             Entry::Section(Section::Voltage) => "# voltage".to_string(),
             Entry::Section(Section::Power) => "# power".to_string(),
-            Entry::Device(Heading::Cpu) => "## CPU".to_string(),
-            Entry::Device(Heading::Name(name)) => format!("## {name}"),
+            Entry::Device(Heading::Cpu, _) => "## CPU".to_string(),
+            Entry::Device(Heading::Name(name), _) => format!("## {name}"),
             Entry::Line(i) => line(i),
             Entry::Separator => "—".to_string(),
             Entry::Message {
@@ -1158,5 +1160,205 @@ fn c_core_menu_40() {
             GeneralTemperature
         );
         assert_eq!(menu::maximum_kind(&[]), GeneralTemperature);
+    });
+}
+
+/// A set of heat.json, whose temperatures lie just below, at and just
+/// above the warm and the hot limit of each kind of device.
+fn heat_set(set: &str) -> Vec<RawReading> {
+    sets("heat.json").remove(set).expect("X-raw-heat set")
+}
+
+/// The layout of `raw` with the stored older pin `@cpu` waiting for
+/// lm-sensors, so that the layout holds a waiting line.
+fn lay_waiting(raw: &[RawReading]) -> Menu {
+    let settings = Settings::default();
+    let shown = menu::shown(raw, &settings);
+    let waiting = ["@cpu".to_string()];
+    menu::menu_with(&shown, &settings, Report::Answered, None, false, &waiting)
+}
+
+/// The layout item of the line `name` of `m`: a reading's short name, or
+/// an identity that starts with `@`.
+fn item_of<'a>(m: &'a Menu, raw: &[RawReading], name: &str) -> &'a Item {
+    let id = if name.starts_with('@') {
+        name.to_string()
+    } else {
+        any_id(raw, name)
+    };
+    m.entries
+        .iter()
+        .find_map(|e| match e {
+            Entry::Line(i) if i.identity == id => Some(i),
+            _ => None,
+        })
+        .unwrap_or_else(|| panic!("no line {id}"))
+}
+
+/// Each Device entry's kind with the identity of the first line under it.
+fn device_kinds(m: &Menu) -> Vec<(IconKind, String)> {
+    let mut out = Vec::new();
+    for (n, e) in m.entries.iter().enumerate() {
+        if let Entry::Device(_, kind) = e {
+            let first = m.entries[n + 1..].iter().find_map(|e| match e {
+                Entry::Line(i) => Some(i.identity.clone()),
+                _ => None,
+            });
+            out.push((*kind, first.expect("a line under the heading")));
+        }
+    }
+    out
+}
+
+/// Set `limits` in Celsius, then in Fahrenheit. In each group of six
+/// readings the values lie below, at and above the warm limit of the
+/// group's kind, then below, at and above its hot limit, so the levels
+/// are normal, warm, warm, warm, hot, hot: a value equal to a limit is at
+/// that limit's level. The CPU and the GPU share 75 and 90 °C, a drive
+/// has 55 and 70 °C, a Wi-Fi card 60 and 80 °C. Each Maximum line, at its
+/// group's highest value, is hot; the wired network card at 60 °C is warm,
+/// the memory module at 80 °C hot, the ACPI zone at 59.5 °C normal. The
+/// levels are the same in both units, because they are read on the value
+/// in °C, while the shown values change unit.
+#[test]
+fn c_core_menu_41() {
+    puron_testkit::limit("C-core.menu-41", LIMIT, || {
+        use Heat::{Hot, Normal, Warm};
+        let raw = heat_set("limits");
+        let six = [Normal, Warm, Warm, Warm, Hot, Hot];
+        let groups = [
+            ["Core 0", "Core 1", "Core 2", "Core 3", "Core 4", "Core 5"],
+            ["g1", "g2", "g3", "g4", "g5", "g6"],
+            ["d1", "d2", "d3", "d4", "d5", "d6"],
+            ["w1", "w2", "w3", "w4", "w5", "w6"],
+        ];
+        let maxima = [
+            "@maximum/cpu",
+            "@maximum/lm-sensors/amdgpu-pci-0300",
+            "@maximum/lm-sensors/nvme-pci-0100",
+            "@maximum/lm-sensors/iwlwifi_1-virtual-0",
+        ];
+        for (unit, sign) in [
+            (TemperatureUnit::Celsius, "°C"),
+            (TemperatureUnit::Fahrenheit, "°F"),
+        ] {
+            let settings = Settings {
+                temperature_unit: unit,
+                ..Settings::default()
+            };
+            let m = lay_with(&raw, &settings);
+            for names in groups {
+                let got: Vec<Heat> = names.iter().map(|n| item_of(&m, &raw, n).heat).collect();
+                assert_eq!(got, six, "{names:?} in {sign}");
+            }
+            for name in maxima {
+                assert_eq!(item_of(&m, &raw, name).heat, Hot, "{name} in {sign}");
+            }
+            assert_eq!(item_of(&m, &raw, "e1").heat, Warm, "e1 in {sign}");
+            assert_eq!(item_of(&m, &raw, "m1").heat, Hot, "m1 in {sign}");
+            assert_eq!(item_of(&m, &raw, "o1").heat, Normal, "o1 in {sign}");
+            let core1 = text(&item_of(&m, &raw, "Core 1").value);
+            assert!(core1.ends_with(sign), "Core 1 shows {core1}");
+        }
+        let fahrenheit = Settings {
+            temperature_unit: TemperatureUnit::Fahrenheit,
+            ..Settings::default()
+        };
+        let m = lay_with(&raw, &fahrenheit);
+        assert_eq!(text(&item_of(&m, &raw, "Core 1").value), "167°F");
+    });
+}
+
+/// Set `edge` with the older pin `@cpu` waiting. A line with no value
+/// (`Core 0`) and a drive's reading below 0 °C, which has no value, are
+/// normal although their group runs hot; `Core 1` at 95 °C and the CPU's
+/// Maximum line are hot; the waiting line is normal, whatever its group's
+/// Maximum; and a fan, a voltage and a power reading are normal although
+/// their numbers lie above every limit.
+#[test]
+fn c_core_menu_42() {
+    puron_testkit::limit("C-core.menu-42", LIMIT, || {
+        let raw = heat_set("edge");
+        let m = lay_waiting(&raw);
+        let core0 = item_of(&m, &raw, "Core 0");
+        assert_eq!(
+            (text(&core0.value).as_str(), core0.heat),
+            ("N/A", Heat::Normal)
+        );
+        assert_eq!(item_of(&m, &raw, "Core 1").heat, Heat::Hot);
+        assert_eq!(item_of(&m, &raw, "@maximum/cpu").heat, Heat::Hot);
+        assert_eq!(item_of(&m, &raw, "@cpu").heat, Heat::Normal);
+        let d1 = item_of(&m, &raw, "d1");
+        assert_eq!((d1.value.is_none(), d1.heat), (true, Heat::Normal));
+        for name in ["f", "v", "p"] {
+            assert_eq!(item_of(&m, &raw, name).heat, Heat::Normal, "{name}");
+        }
+    });
+}
+
+/// The kinds of the Device and Line entries. In set `limits` each device
+/// heading has the kind of its lines: the CPU group the CPU, then a GPU,
+/// a drive, a Wi-Fi card, a wired network card, a memory module and an
+/// ACPI zone, which has the general kind; each line has its own line's
+/// kind. In set `waiting` a CPU group that holds only the waiting line
+/// still has the CPU's kind, and so has the line. In set `edge` the
+/// waiting line has the CPU's kind, and the fan, the voltage and the
+/// power reading the kinds of their classes.
+#[test]
+fn c_core_menu_43() {
+    puron_testkit::limit("C-core.menu-43", LIMIT, || {
+        use IconKind::*;
+        let raw = heat_set("limits");
+        let m = lay(&raw);
+        let chip_kinds = [
+            ("coretemp-isa-0000", CpuTemperature),
+            ("amdgpu-pci-0300", GpuTemperature),
+            ("nvme-pci-0100", DriveTemperature),
+            ("iwlwifi_1-virtual-0", WifiTemperature),
+            ("ixgbe-pci-0900", WiredNetworkTemperature),
+            ("jc42-i2c-0-18", MemoryTemperature),
+            ("acpitz-acpi-0", GeneralTemperature),
+        ];
+        let kind_of_id = |id: &str| {
+            let chip = chip_kinds.iter().find(|(c, _)| id.contains(c));
+            chip.map(|(_, k)| *k)
+                .unwrap_or_else(|| panic!("no chip in {id}"))
+        };
+        let devices = device_kinds(&m);
+        assert_eq!(devices.len(), 7, "{devices:?}");
+        for (kind, first) in &devices {
+            assert_eq!(*kind, kind_of_id(first), "the heading above {first}");
+        }
+        let shown = menu::shown(&raw, &Settings::default());
+        let mut lines = 0;
+        for e in &m.entries {
+            if let Entry::Line(i) = e {
+                let want = if i.identity == "@maximum/cpu" {
+                    CpuTemperature
+                } else {
+                    kind_of_id(&i.identity)
+                };
+                assert_eq!(i.kind, want, "{}", i.identity);
+                let line = shown.line(&i.identity).expect("a shown line");
+                assert_eq!(i.kind, menu::icon_kind(line), "{}", i.identity);
+                lines += 1;
+            }
+        }
+        assert_eq!(lines, 31);
+
+        let raw = heat_set("waiting");
+        let m = lay_waiting(&raw);
+        let devices = device_kinds(&m);
+        assert_eq!(devices[0], (CpuTemperature, "@cpu".to_string()));
+        assert_eq!(item_of(&m, &raw, "@cpu").kind, CpuTemperature);
+
+        let raw = heat_set("edge");
+        let m = lay_waiting(&raw);
+        assert_eq!(item_of(&m, &raw, "@cpu").kind, CpuTemperature);
+        let others: Vec<IconKind> = ["f", "v", "p"]
+            .iter()
+            .map(|n| item_of(&m, &raw, n).kind)
+            .collect();
+        assert_eq!(others, [Fan, Voltage, Power]);
     });
 }
