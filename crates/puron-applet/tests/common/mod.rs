@@ -181,3 +181,16 @@ pub fn icons(p: &Panel) -> Vec<Option<Icon>> {
         })
         .collect()
 }
+
+/// Sets up the translated texts in English from the shipped catalogs, as
+/// the program's own start does, but without reading the locale of the
+/// machine that runs the tests. The tests that call it compare drawn
+/// texts with English ones, so on a machine set to Swedish or any other
+/// shipped language they would otherwise read that language and fail.
+/// The loader sees `LANG=en_US.UTF-8` and no other locale variable. Only
+/// the first set-up in a test process counts, so every test of a file
+/// that expects English must call this rather than the program's start.
+pub fn start_in_english() {
+    let english = |name: &str| (name == "LANG").then(|| std::ffi::OsString::from("en_US.UTF-8"));
+    puron_applet::i18n::start_with(Box::new(puron_applet::i18n::Catalogs), english);
+}

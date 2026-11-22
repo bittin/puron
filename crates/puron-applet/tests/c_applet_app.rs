@@ -877,7 +877,7 @@ fn waiting_line(plan: &puron_applet::popup::Plan) -> Option<(String, String, boo
 #[test]
 fn c_applet_app_30() {
     puron_testkit::limit("C-applet.app-30", LIMIT, || {
-        puron_applet::start();
+        common::start_in_english();
         let failed = || {
             let mut s = drive_snapshot("lm-sensors-off");
             s.lm_sensors = puron_engine::engine::LmReport::Unavailable;

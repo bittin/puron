@@ -10,6 +10,8 @@
 //! rectangles in logical pixels with a tolerance of half a pixel.
 #![allow(non_snake_case)]
 
+mod common;
+
 use cosmic::iced::{Rectangle, Size};
 use cosmic::widget::{container, Id};
 use cosmic::Theme;
@@ -37,7 +39,7 @@ const ALL: [Source; 5] = [
 const OFF: [Source; 5] = [Source::Off; 5];
 
 fn plan_of(package: Package, sources: [Source; 5]) -> Plan {
-    puron_applet::start();
+    common::start_in_english();
     about::plan(&Input {
         version: "1.6.0".to_string(),
         package,
@@ -419,7 +421,7 @@ fn dump_file(name: &str) -> String {
 /// The Settings plan of the `good` fixture, its settings shown and
 /// applied, on the Debian package with the source set `all`.
 fn settings_plan() -> settings::Plan {
-    puron_applet::start();
+    common::start_in_english();
     let fx = cfg::build("good");
     let values = Config::new(&fx.root).load().settings;
     settings::plan(&settings::Input {

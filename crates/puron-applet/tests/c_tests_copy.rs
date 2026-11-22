@@ -201,7 +201,7 @@ fn user_name() -> String {
 #[test]
 fn c_tests_46() {
     puron_testkit::limit("C-tests-46", LIMIT, || {
-        puron_applet::start();
+        common::start_in_english();
         let dir = puron_testkit::temp_dir("c-tests-46");
         let chip = Some("puron-isa-0000");
         let nvme = Some("Acme NVMe 4TB S5GXNF0R123456");
@@ -321,7 +321,7 @@ fn c_tests_47() {
     let file = puron_testkit::temp_dir("c-tests-47").join("args.txt");
     std::env::set_var("PURON_TEST_ARGFILE", &file);
     puron_testkit::limit("C-tests-47", 10, move || {
-        puron_applet::start();
+        common::start_in_english();
         let dir = puron_testkit::temp_dir("c-tests-47-kernel");
         let c = cfg::build("good");
         let open = puron_testkit::workspace_root().join("crates/puron-testkit/fixtures/prog/open");
@@ -373,7 +373,7 @@ fn c_tests_53() {
     use puron_applet::popup;
 
     puron_testkit::limit("C-tests-53", 5, || {
-        puron_applet::start();
+        common::start_in_english();
         let plan = about::plan(&about::Input {
             version: "1.6.0".to_string(),
             package: Package::Deb,

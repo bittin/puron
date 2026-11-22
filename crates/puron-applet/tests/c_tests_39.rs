@@ -36,7 +36,7 @@ fn c_tests_39() {
     let file = puron_testkit::temp_dir("c-tests-39").join("args.txt");
     std::env::set_var("PURON_TEST_ARGFILE", &file);
     puron_testkit::limit("C-tests-39", 10, move || {
-        puron_applet::start();
+        common::start_in_english();
         let plan = about::plan(&Input {
             version: "1.6.0".to_string(),
             package: Package::Deb,

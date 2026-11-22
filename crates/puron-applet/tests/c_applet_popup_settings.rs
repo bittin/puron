@@ -45,7 +45,7 @@ type Sim<'a> = Simulator<'a, Clicked, Theme, cosmic::Renderer>;
 /// The Settings plan of the settings stored in fixture `name`, with no
 /// typed text and a notice when `notice` is true.
 fn plan_of(name: &str, notice: bool) -> Plan {
-    puron_applet::start();
+    common::start_in_english();
     let fx = cfg::build(name);
     settings::plan(&input(Config::new(&fx.root).load().settings, notice))
 }
@@ -81,7 +81,7 @@ fn plan() -> Plan {
 /// The Settings plan that the applet's state machine draws after Start
 /// and Settings on fixture `name`.
 fn app_plan(name: &str) -> Plan {
-    puron_applet::start();
+    common::start_in_english();
     let fx = cfg::build(name);
     let mut a = app(&fx.root, &handle(0));
     a.handle(Event::Start);

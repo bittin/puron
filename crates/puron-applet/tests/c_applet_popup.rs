@@ -8,6 +8,8 @@
 //! default settings and the pinned list `P1` of `pins.json`.
 #![allow(non_snake_case)]
 
+mod common;
+
 use std::collections::BTreeMap;
 
 use cosmic::applet::cosmic_panel_config::PanelSize;
@@ -73,10 +75,10 @@ fn icon_size() -> u16 {
     })
 }
 
-/// Chooses the language as the program does, so that the texts are
-/// English in a test environment without locale variables.
+/// Chooses English for the texts, whatever the locale of the machine that
+/// runs the tests.
 fn setup() {
-    puron_applet::start();
+    common::start_in_english();
 }
 
 fn plan_of(menu: &Menu, pins: &[String]) -> Plan {

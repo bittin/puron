@@ -13,6 +13,8 @@
 //! logical pixels with a tolerance of half a pixel.
 #![allow(non_snake_case)]
 
+mod common;
+
 use std::collections::BTreeMap;
 use std::process::Command;
 
@@ -165,7 +167,7 @@ fn at_right(what: &str, width: f32, r: Rectangle, root: Rectangle) {
 #[test]
 fn c_applet_popup_44__plans() {
     puron_testkit::limit("C-applet.popup-44", LIMIT, || {
-        puron_applet::start();
+        common::start_in_english();
         assert_eq!(PAGE_SIDE_PADDING, 24);
         assert_eq!(readings_plan().side_padding, PAGE_SIDE_PADDING, "readings");
         assert_eq!(about_plan().side_padding, PAGE_SIDE_PADDING, "About");
@@ -187,7 +189,7 @@ fn temperature_heading(plan: &popup::Plan) -> usize {
 #[test]
 fn c_applet_popup_44__readings() {
     puron_testkit::limit("C-applet.popup-44", LIMIT, || {
-        puron_applet::start();
+        common::start_in_english();
         let plan = readings_plan();
         let heading = temperature_heading(&plan);
         for width in [popup::WIDTH, popup::MAX_WIDTH] {
@@ -215,7 +217,7 @@ fn c_applet_popup_44__readings() {
 #[test]
 fn c_applet_popup_44__about() {
     puron_testkit::limit("C-applet.popup-44", LIMIT, || {
-        puron_applet::start();
+        common::start_in_english();
         let plan = about_plan();
         let headings: Vec<usize> = plan
             .entries
@@ -266,7 +268,7 @@ fn temperature_icon_x(width: f32) -> f32 {
 #[test]
 fn c_applet_popup_44__settings() {
     puron_testkit::limit("C-applet.popup-44", LIMIT, || {
-        puron_applet::start();
+        common::start_in_english();
         let plan = settings_plan();
         for width in [popup::WIDTH, popup::MAX_WIDTH] {
             let readings = temperature_icon_x(width);
@@ -297,7 +299,7 @@ fn c_applet_popup_44__settings() {
 #[test]
 fn c_applet_popup_45() {
     puron_testkit::limit("C-applet.popup-45", LIMIT, || {
-        puron_applet::start();
+        common::start_in_english();
         let plan = settings_plan();
         let got: Vec<(String, &str, Role)> = plan
             .sections()
@@ -382,7 +384,7 @@ fn want(text: &str, role: Role) -> (String, Role) {
 #[test]
 fn c_applet_popup_46__available() {
     puron_testkit::limit("C-applet.popup-46", LIMIT, || {
-        puron_applet::start();
+        common::start_in_english();
         let s = Settings::default();
         assert!(s.provider_lm_sensors);
         let input = settings_input(s, Package::Deb, ALL, 0);
@@ -396,7 +398,7 @@ fn c_applet_popup_46__available() {
 #[test]
 fn c_applet_popup_46__off() {
     puron_testkit::limit("C-applet.popup-46", LIMIT, || {
-        puron_applet::start();
+        common::start_in_english();
         let s = Settings::default();
         assert!(!s.provider_udisks2);
         let input = settings_input(s, Package::Deb, ALL, 0);
@@ -409,7 +411,7 @@ fn c_applet_popup_46__off() {
 #[test]
 fn c_applet_popup_46__unavailable() {
     puron_testkit::limit("C-applet.popup-46", LIMIT, || {
-        puron_applet::start();
+        common::start_in_english();
         let s = Settings {
             provider_nvidia: true,
             ..Settings::default()
@@ -426,7 +428,7 @@ fn c_applet_popup_46__unavailable() {
 #[test]
 fn c_applet_popup_46__flatpak() {
     puron_testkit::limit("C-applet.popup-46", LIMIT, || {
-        puron_applet::start();
+        common::start_in_english();
         let on = Settings {
             provider_liquidctl: true,
             ..Settings::default()
@@ -458,7 +460,7 @@ fn c_applet_popup_46__flatpak() {
 #[test]
 fn c_applet_popup_46__drives() {
     puron_testkit::limit("C-applet.popup-46", LIMIT, || {
-        puron_applet::start();
+        common::start_in_english();
         let s = Settings {
             provider_lm_sensors: true,
             provider_lm_sensors_drives: true,
@@ -493,7 +495,7 @@ fn c_applet_popup_46__drives() {
 #[test]
 fn c_applet_popup_46__started() {
     puron_testkit::limit("C-applet.popup-46", LIMIT, || {
-        puron_applet::start();
+        common::start_in_english();
         let s = Settings {
             provider_nvme: true,
             ..Settings::default()
@@ -553,7 +555,7 @@ fn inside(r: Rectangle, area: Rectangle) -> bool {
 #[test]
 fn c_applet_popup_48() {
     puron_testkit::limit("C-applet.popup-48", LIMIT, || {
-        puron_applet::start();
+        common::start_in_english();
         let plan = settings_plan();
         let mut s = sim(settings::view(&plan), popup::MAX_WIDTH);
         let mut n = 0;

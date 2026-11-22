@@ -120,7 +120,7 @@ fn bounds(sim: &mut Sim, id: Id) -> cosmic::iced::Rectangle {
 #[test]
 fn c_tests_33() {
     puron_testkit::limit("C-tests-33", LIMIT, || {
-        puron_applet::start();
+        common::start_in_english();
         let plan = about::plan(&input(Package::Deb, ALL));
         assert_eq!(
             notation(&plan),
@@ -224,7 +224,7 @@ fn view_about(a: &puron_applet::app::App) -> (Page, Option<Plan>) {
 #[test]
 fn c_tests_37() {
     puron_testkit::limit("C-tests-37", LIMIT, || {
-        puron_applet::start();
+        common::start_in_english();
         let c = cfg::build("good");
         let h = handle(0);
         let mut a = app(&c.root, &h);
@@ -287,7 +287,7 @@ fn c_tests_37() {
 #[test]
 fn c_tests_38() {
     puron_testkit::limit("C-tests-38", LIMIT, || {
-        puron_applet::start();
+        common::start_in_english();
         let plan = about::plan(&input(Package::Deb, ALL));
         let field = |name: &str| {
             plan.entries
@@ -325,7 +325,7 @@ fn c_tests_38() {
 #[test]
 fn c_tests_40() {
     puron_testkit::limit("C-tests-40", LIMIT, || {
-        puron_applet::start();
+        common::start_in_english();
         let c = cfg::build("good");
         let h = handle(0);
         let mut a = app(&c.root, &h);
@@ -466,7 +466,7 @@ fn c_tests_44() {
 #[test]
 fn c_tests_34__plan() {
     puron_testkit::limit("C-tests-34", LIMIT, || {
-        puron_applet::start();
+        common::start_in_english();
         for (package, want) in [
             (Package::Deb, "field Package Debian package"),
             (Package::Flatpak, "field Package Flatpak"),

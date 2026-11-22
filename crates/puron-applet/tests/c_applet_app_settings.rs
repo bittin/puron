@@ -76,7 +76,7 @@ fn not_root() {
 /// An applet over the fixture's settings, started, with the Settings
 /// page shown. The event Settings stores nothing.
 fn open_with(fx: &Cfg, h: &Arc<eng::Handle>) -> App {
-    puron_applet::start();
+    common::start_in_english();
     let mut a = app(&fx.root, h);
     a.handle(Event::Start);
     assert_eq!(stores(&a.handle(Event::Settings)), vec![], "Settings");
@@ -554,7 +554,7 @@ fn c_applet_app_43() {
         if std::env::var_os(NO_ROOT).is_some() {
             assert_eq!(puron_config::user_root(), None);
             assert!(Config::user().watch(|_| {}).is_none(), "no watch");
-            puron_applet::start();
+            common::start_in_english();
             let mut a = App::new(Arc::new(H(handle(0))), Config::user(), no_programs());
             a.handle(Event::Start);
             a.handle(Event::Settings);
@@ -759,7 +759,7 @@ fn c_applet_app_45() {
 #[test]
 fn c_applet_app_46() {
     puron_testkit::limit("C-applet.app-46", LIMIT, || {
-        puron_applet::start();
+        common::start_in_english();
         let fx = cfg::build("p5");
         let mut a = app(&fx.root, &handle(0));
         a.handle(Event::Start);
