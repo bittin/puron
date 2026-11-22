@@ -864,7 +864,7 @@ fn waiting_line(plan: &puron_applet::popup::Plan) -> Option<(String, String, boo
         .rev()
         .find(|e| matches!(e, Drawn::Device { .. }))
     {
-        Some(Drawn::Device { text }) => text.clone(),
+        Some(Drawn::Device { text, .. }) => text.clone(),
         _ => String::new(),
     };
     Some((l.text.clone(), l.value.clone(), l.pinned, heading))
@@ -895,7 +895,7 @@ fn c_applet_app_30() {
         assert_eq!(waiting_line(&plan), Some(want.clone()));
         // The CPU group comes first, before the drives.
         let first = plan.entries.iter().find_map(|e| match e {
-            puron_applet::popup::Drawn::Device { text } => Some(text.clone()),
+            puron_applet::popup::Drawn::Device { text, .. } => Some(text.clone()),
             _ => None,
         });
         assert_eq!(first.as_deref(), Some("CPU"));

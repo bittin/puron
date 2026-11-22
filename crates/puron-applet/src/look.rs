@@ -1,17 +1,18 @@
-//! The look of the popup's About and Settings pages: the color roles that
-//! their plans name, the one function that turns a role into a color of
-//! the desktop theme, the text styles, and the rounded card that holds a
-//! group of items on both pages.
+//! The look of the popup's pages: the color roles that their plans name,
+//! the one function that turns a role into a color of the desktop theme,
+//! the text styles, the icon tile of a section heading, and the rounded
+//! card that holds a group of items.
 //!
 //! A plan never holds a color, only a role, so that the same plan is
 //! drawn in light colors on a dark theme and in dark colors on a light
-//! one. Only `color` reads colors from the theme; every widget of the two
+//! one. Only `color` reads colors from the theme; every widget of the
 //! pages that is not in the theme's default text color gets its color
 //! from it.
 
+use cosmic::iced::alignment::{Horizontal, Vertical};
 use cosmic::iced::widget::svg;
 use cosmic::iced::{Background, Border, Color, Length, Padding};
-use cosmic::widget::{container, icon, text};
+use cosmic::widget::{container, icon, text, Id};
 
 use crate::popup::PAGE_SIDE_PADDING;
 
@@ -29,41 +30,51 @@ pub fn content_padding() -> Padding {
     }
 }
 
-/// The color role of a text, an icon or a tile on the About and Settings
-/// pages.
+/// The color role of a text, an icon or a tile on a page of the popup.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Role {
     /// The text color of whatever holds the widget: no color is set.
     Default,
-    /// The grey of secondary text: field labels, small headings, and a
-    /// source that is off or not available.
+    /// The grey of secondary text: field labels, small headings, a source
+    /// that is off or not available, the icons of "Settings" and "About",
+    /// and the icon of a device that Puron does not tell apart.
     Muted,
     /// A source that is available.
     Success,
-    /// liquidctl in the Flatpak, which cannot run the host's program.
+    /// liquidctl in the Flatpak, which cannot run the host's program, and
+    /// a temperature that runs warm.
     Warning,
-    /// The user's accent color: the About page's links and the Settings
-    /// section Display Options.
+    /// The theme's red, for a temperature that runs hot.
+    Destructive,
+    /// The user's accent color: the About page's links, the Settings
+    /// section Display Options, the section Fan and the check mark of a
+    /// pinned line.
     Accent,
-    /// The Settings section Generic Sensor Providers.
+    /// The section Temperature.
+    Orange,
+    /// The Settings section Generic Sensor Providers, the section Voltage
+    /// and the CPU.
     Yellow,
-    /// The Settings section GPU Sensor Providers.
+    /// The Settings section GPU Sensor Providers, the section Power and a
+    /// GPU.
     Purple,
-    /// The Settings section Drive Sensor Providers. Not the palette's
-    /// blue, because that is the default accent and so the color of
-    /// Display Options.
+    /// The Settings section Drive Sensor Providers, a drive and a memory
+    /// module. Not the palette's blue, because that is the default accent
+    /// and so the color of Display Options.
     Indigo,
-    /// The Settings section Show Sensors.
+    /// The Settings section Show Sensors and a network card.
     Green,
 }
 
 /// Every role, in the order of the enum.
-pub const ROLES: [Role; 9] = [
+pub const ROLES: [Role; 11] = [
     Role::Default,
     Role::Muted,
     Role::Success,
     Role::Warning,
+    Role::Destructive,
     Role::Accent,
+    Role::Orange,
     Role::Yellow,
     Role::Purple,
     Role::Indigo,
@@ -76,9 +87,9 @@ pub const ROLES: [Role; 9] = [
 /// The grey is the palette's `neutral_9` at alpha 0.7, the color that
 /// libcosmic itself gives the placeholder text of a text input. The
 /// palette fields are defined for each theme mode, so the same role is
-/// light on a dark theme and dark on a light one; the success, warning
-/// and accent colors follow the user's own choices when the theme has
-/// them.
+/// light on a dark theme and dark on a light one; the success, warning,
+/// destructive and accent colors follow the user's own choices when the
+/// theme has them.
 pub fn color(role: Role, theme: &cosmic::Theme) -> Option<Color> {
     let t = theme.cosmic();
     let p = &t.palette;
@@ -91,7 +102,9 @@ pub fn color(role: Role, theme: &cosmic::Theme) -> Option<Color> {
         }
         Role::Success => t.success_color(),
         Role::Warning => t.warning_color(),
+        Role::Destructive => t.destructive_color(),
         Role::Accent => t.accent_text_color(),
+        Role::Orange => p.accent_orange,
         Role::Yellow => p.accent_yellow,
         Role::Purple => p.accent_purple,
         Role::Indigo => p.accent_indigo,
@@ -135,6 +148,16 @@ pub fn styled<'a, M: 'a>(content: String, style: TextStyle, role: Role) -> cosmi
     }
 }
 
+/// The text `content` in libcosmic's plain text style, the style of the
+/// temperatures' names and values, colored by `role`.
+pub fn plain<'a, M: 'a>(content: String, role: Role) -> cosmic::Element<'a, M> {
+    let t = text(content);
+    match active(role) {
+        Some(c) => t.class(cosmic::theme::Text::Color(c)).into(),
+        None => t.into(),
+    }
+}
+
 /// The symbolic icon `name` from the icon theme, `size` px square, drawn
 /// in the color of `role`.
 pub fn tinted_icon<'a, M: 'a>(name: &'static str, size: u16, role: Role) -> cosmic::Element<'a, M> {
@@ -149,7 +172,35 @@ pub fn tinted_icon<'a, M: 'a>(name: &'static str, size: u16, role: Role) -> cosm
     }
 }
 
-/// The style of a Settings section's icon tile in `theme`: the color of
+/// The side in px of the icon tile in front of a section heading, on the
+/// temperatures and on the Settings page alike.
+pub const TILE: f32 = 28.0;
+/// The side in px of the icon in a tile, whatever the panel's icon size.
+pub const TILE_ICON: u16 = 16;
+/// The space in px between a tile and its heading text.
+pub const TILE_GAP: f32 = 10.0;
+
+/// A section heading's icon tile: `icon` at `TILE_ICON` px in the color
+/// of `role`, centered on a `TILE` px square in the faint color of
+/// `tile`. The square has the ID `tile_id` and the icon `icon_id`, so that
+/// tests can find their rectangles.
+pub fn icon_tile<'a, M: 'a>(
+    icon: &'static str,
+    role: Role,
+    tile_id: Id,
+    icon_id: Id,
+) -> cosmic::Element<'a, M> {
+    container(container(tinted_icon(icon, TILE_ICON, role)).id(icon_id))
+        .id(tile_id)
+        .width(Length::Fixed(TILE))
+        .height(Length::Fixed(TILE))
+        .align_x(Horizontal::Center)
+        .align_y(Vertical::Center)
+        .class(cosmic::theme::Container::custom(move |t| tile(role, t)))
+        .into()
+}
+
+/// The style of a section's icon tile in `theme`: the color of
 /// `role`, faint enough for the icon on it to stand out (alpha 0.18 on a
 /// dark theme, 0.12 on a light one, where the same color looks stronger),
 /// with the theme's small corner radius.

@@ -13,3 +13,5 @@ cosmic	actions	list-remove-symbolic
 cosmic	actions	list-add-symbolic
 cosmic	actions	insert-arrow-symbolic
 cosmic	devices	video-display-symbolic
+cosmic	categories	preferences-system-symbolic
+cosmic	actions	help-about-symbolic

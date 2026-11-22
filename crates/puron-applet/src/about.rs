@@ -491,7 +491,8 @@ fn styled_text<'a>(content: String, look: &Look, n: usize) -> cosmic::Element<'a
 /// A text that tests measure sits in a container with the ID
 /// `popup::element_id(i, part)`: Back's and a link's `icon`, a link's,
 /// the header's, a heading's and the button's `text`, a field's `label`,
-/// and a source's `state` and `count`.
+/// and a source's `state` and `count`; the "Copy details" button itself
+/// sits in one with the ID `button`.
 fn entry_view<'a>(i: usize, e: &Entry, look: &Look) -> cosmic::Element<'a, Clicked> {
     let part = |content: cosmic::Element<'a, Clicked>, name: &str| {
         container(content).id(element_id(i, name))
@@ -585,14 +586,28 @@ fn entry_view<'a>(i: usize, e: &Entry, look: &Look) -> cosmic::Element<'a, Click
                 .height(Length::Fill)
                 .align_x(Horizontal::Center)
                 .align_y(Vertical::Center);
-            button::custom(label)
-                .class(cosmic::theme::Button::Suggested)
+            let pressed = button::custom(label)
+                .class(press_class(look.press))
                 .padding([0.0, f32::from(space.space_s)])
                 .width(Length::Fill)
                 .height(Length::Fixed(f32::from(space.space_l)))
-                .on_press(Clicked::Copy)
-                .into()
+                .on_press(Clicked::Copy);
+            // The container that carries the button's ID sets no width of
+            // its own, so its rectangle is the button's, whatever width the
+            // button has.
+            part(pressed.into(), "button").into()
         }
+    }
+}
+
+/// The libcosmic button class of `press`, so that the button drawn is the
+/// one that the plan names.
+fn press_class(press: Option<Press>) -> cosmic::theme::Button {
+    match press {
+        Some(Press::Menu) => cosmic::theme::Button::AppletMenu,
+        Some(Press::Link) => cosmic::theme::Button::Link,
+        Some(Press::Suggested) => cosmic::theme::Button::Suggested,
+        None => cosmic::theme::Button::Standard,
     }
 }
 

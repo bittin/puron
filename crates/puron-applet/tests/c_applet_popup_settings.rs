@@ -675,31 +675,44 @@ fn c_applet_popup_38() {
 /// In the narrowest popup every label still ends before its control,
 /// every control ends inside the scroll area, and every control keeps the
 /// width it has in the widest popup: the label gives way, not the control.
+/// This holds for the `good` fixture on the Debian package, and in the
+/// Flatpak with liquidctl switched on, where item 12 shows the longest
+/// state line, "not available in the Flatpak".
 #[test]
 fn c_applet_popup_39() {
     puron_testkit::limit("C-applet.popup-39", LIMIT, || {
-        let plan = plan();
-        let mut wide = sim(&plan, WIDE);
-        let w472: Vec<f32> = (1..=20).map(|n| control(&mut wide, n).width).collect();
-        let mut sim = sim(&plan, NARROW);
-        let (area, _) = scroll(&mut sim);
-        for n in 1..=20 {
-            let l = label(&mut sim, &plan, n);
-            let c = control(&mut sim, n);
-            assert!(
-                l.x + l.width <= c.x + TOL,
-                "item {n}: label {l:?} over control {c:?}"
-            );
-            assert!(
-                c.x + c.width <= area.x + area.width + TOL,
-                "item {n}: control {c:?} past the scroll area {area:?}"
-            );
-            assert!(
-                near(c.width, w472[n - 1], TOL),
-                "item {n}: control width {} at 360, {} at 472",
-                c.width,
-                w472[n - 1]
-            );
+        let debian = plan();
+        let fx = cfg::build("good");
+        let mut values = Config::new(&fx.root).load().settings;
+        values.provider_liquidctl = true;
+        let mut flatpak = input(values, false);
+        flatpak.package = Package::Flatpak;
+        let flatpak = settings::plan(&flatpak);
+        let state = item(&flatpak, 12).state.map(|s| s.text);
+        assert_eq!(state.as_deref(), Some("not available in the Flatpak"));
+        for (name, plan) in [("Debian", &debian), ("Flatpak", &flatpak)] {
+            let mut wide = sim(plan, WIDE);
+            let w472: Vec<f32> = (1..=20).map(|n| control(&mut wide, n).width).collect();
+            let mut sim = sim(plan, NARROW);
+            let (area, _) = scroll(&mut sim);
+            for n in 1..=20 {
+                let l = label(&mut sim, plan, n);
+                let c = control(&mut sim, n);
+                assert!(
+                    l.x + l.width <= c.x + TOL,
+                    "{name}, item {n}: label {l:?} over control {c:?}"
+                );
+                assert!(
+                    c.x + c.width <= area.x + area.width + TOL,
+                    "{name}, item {n}: control {c:?} past the scroll area {area:?}"
+                );
+                assert!(
+                    near(c.width, w472[n - 1], TOL),
+                    "{name}, item {n}: control width {} at 360, {} at 472",
+                    c.width,
+                    w472[n - 1]
+                );
+            }
         }
     });
 }

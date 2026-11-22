@@ -106,7 +106,7 @@ fn notation(plan: &Plan) -> Vec<String> {
                 l.value,
             ),
             Drawn::Section { text, .. } => text.clone(),
-            Drawn::Device { text } => format!("  {text}"),
+            Drawn::Device { text, .. } => format!("  {text}"),
             Drawn::Separator => "—".into(),
             Drawn::Message { .. } => "message".into(),
             Drawn::HomepageLink { .. } => "homepage".into(),
@@ -298,8 +298,8 @@ fn c_applet_popup_23() {
 }
 
 /// A section heading uses libcosmic's heading style, with 21 px of line
-/// height against a line's smaller one, and its icon has the panel's
-/// icon size.
+/// height against a line's smaller one, and its icon, in its tile, is
+/// 16 px whatever the panel's icon size.
 #[test]
 fn section_heading_style_and_icon() {
     puron_testkit::limit("section_heading_style_and_icon", LIMIT, || {
@@ -320,7 +320,7 @@ fn section_heading_style_and_icon() {
             assert!(name.height < 21.0, "line text {name:?}");
             let icon = element(&mut sim, section, "icon");
             assert!(
-                near(icon.width, f32::from(size), 0.5) && near(icon.height, f32::from(size), 0.5),
+                near(icon.width, 16.0, 0.5) && near(icon.height, 16.0, 0.5),
                 "icon {size}: {icon:?}"
             );
         }
@@ -336,9 +336,9 @@ fn c_applet_popup_5() {
         let mut sim = simulate(&plan);
         let line = bounds(&mut sim, popup::entry_id(i));
         let value = element(&mut sim, i, "value");
-        // The value ends where the line's button ends, less libcosmic's
-        // right padding.
-        let edge = right(&line) - applet::menu_control_padding().right;
+        // The line's rectangle is its content inside the padding of its
+        // card item, so the value ends at its right edge.
+        let edge = right(&line);
         assert!(
             near(right(&value), edge, 0.5),
             "value right {}, content edge {edge}",
@@ -358,29 +358,48 @@ fn c_applet_popup_6() {
     });
 }
 
+/// The captured readings drawn 360 and 472 px wide. A device heading's
+/// icon starts 4 px right of its section heading's left edge, the left
+/// edge of the tile, and its name 28 px right of it. Each card starts at
+/// its section heading's left edge, and each line's check slot 8 px inside
+/// its card, the fan and voltage lines too, which have no device heading.
 #[test]
 fn c_applet_popup_7() {
     puron_testkit::limit("C-applet.popup-7", LIMIT, || {
         setup();
         let (_, plan) = capture_plan(&pinned("P1"));
-        let at = |want: fn(&Drawn) -> bool| -> Vec<usize> {
-            let found = plan.entries.iter().enumerate();
-            found.filter(|(_, e)| want(e)).map(|(i, _)| i).collect()
-        };
-        let sections = at(|e| matches!(e, Drawn::Section { .. }));
-        let devices = at(|e| matches!(e, Drawn::Device { .. }));
-        let lines = at(|e| matches!(e, Drawn::Line(_)));
-        let mut sim = simulate(&plan);
-        let section = bounds(&mut sim, popup::entry_id(sections[0]));
-        for i in devices {
-            let r = bounds(&mut sim, popup::entry_id(i));
-            assert!(near(r.x, section.x + popup::DEVICE_INDENT, 0.5), "{i}");
-        }
-        // Fan and voltage lines have no device heading, yet start at the
-        // same indent as the other lines.
-        for i in lines {
-            let r = bounds(&mut sim, popup::entry_id(i));
-            assert!(near(r.x, section.x + popup::LINE_INDENT, 0.5), "{i}");
+        for width in [popup::WIDTH, popup::MAX_WIDTH] {
+            let mut sim = simulate_at(&plan, width);
+            let mut tile: Option<Rectangle> = None;
+            let mut lines = 0;
+            for (i, e) in plan.entries.iter().enumerate() {
+                match e {
+                    Drawn::Section { .. } => tile = Some(element(&mut sim, i, "tile")),
+                    Drawn::Device { .. } => {
+                        let edge = tile.expect("a section above").x;
+                        let icon = element(&mut sim, i, "icon");
+                        let name = element(&mut sim, i, "name");
+                        assert!(near(icon.x, edge + 4.0, 0.5), "{width}: icon {i} {icon:?}");
+                        assert!(near(name.x, edge + 28.0, 0.5), "{width}: name {i} {name:?}");
+                    }
+                    Drawn::Line(l) => {
+                        let edge = tile.expect("a section above").x;
+                        let card = bounds(&mut sim, popup::card_id(l.card));
+                        let check = element(&mut sim, i, "check");
+                        assert!(
+                            near(card.x, edge, 0.5),
+                            "{width}: card {card:?} of line {i}"
+                        );
+                        assert!(
+                            near(check.x, card.x + 8.0, 0.5),
+                            "{width}: check slot {check:?} in card {card:?}"
+                        );
+                        lines += 1;
+                    }
+                    _ => {}
+                }
+            }
+            assert!(lines > 10, "{width}: {lines} lines");
         }
     });
 }
@@ -450,7 +469,9 @@ fn c_applet_popup_12() {
         assert_eq!(
             plan.entries[w],
             Drawn::HomepageLink {
-                text: i18n::text("link-homepage")
+                text: i18n::text("link-homepage"),
+                icon: popup::ABOUT_ICON,
+                role: puron_applet::look::Role::Muted,
             }
         );
         // The entry "About" shows the About page in the same popup, which
@@ -511,7 +532,7 @@ fn c_applet_popup_14() {
             .entries
             .iter()
             .filter_map(|e| match e {
-                Drawn::Section { text, icon } => Some((text.as_str(), *icon)),
+                Drawn::Section { text, icon, .. } => Some((text.as_str(), *icon)),
                 _ => None,
             })
             .collect();
@@ -657,7 +678,7 @@ fn c_applet_popup_18() {
             .entries
             .iter()
             .filter_map(|e| match e {
-                Drawn::Device { text } => Some(text.as_str()),
+                Drawn::Device { text, .. } => Some(text.as_str()),
                 Drawn::Line(l) if !l.identity.starts_with("@maximum") => Some(l.text.as_str()),
                 _ => None,
             })
@@ -697,19 +718,19 @@ fn c_applet_popup_18() {
             }
         }
         // The width follows the longest line, between the two limits. With
-        // 7 px per character, a line takes 48 of padding, 24 of indent, 20
-        // of check slot, its name, 8 of gap and 64 for the value.
+        // 7 px per character, a line takes 48 of padding, 8 of padding in
+        // its card, 20 of check slot, its name, 8 of gap, 64 for the value
+        // and 14 of padding in its card: 470 px for 44 characters, which
+        // the widest popup, 472 px, holds.
         let measure = |t: &str| t.chars().count() as f32 * 7.0;
         let fit = |raw: &[RawReading]| popup::fit_width(&lay_with(raw), 20, 48.0, &measure);
         assert_eq!(fit(&cpu_set("no-cpu")), popup::WIDTH);
         assert_eq!(
             fit(&cpu_set("long-names")),
-            48.0 + 24.0 + 20.0 + 44.0 * 7.0 + 8.0 + 64.0
+            48.0 + 8.0 + 20.0 + 44.0 * 7.0 + 8.0 + 64.0 + 14.0
         );
-        assert_eq!(
-            popup::MAX_WIDTH,
-            48.0 + 24.0 + 20.0 + 44.0 * 7.0 + 8.0 + 64.0
-        );
+        assert_eq!(fit(&cpu_set("long-names")), 470.0);
+        assert_eq!(popup::MAX_WIDTH, 472.0);
         // A 60-character name is shortened so that, with the default line's
         // " (default)", the text has exactly 44 characters.
         let mut raw = cpu_set("example");
@@ -743,7 +764,7 @@ fn c_applet_popup_18() {
         raw[0].device_chars = 60;
         let plan = plan_of(&lay_with(&raw), &[]);
         let heading = plan.entries.iter().find_map(|e| match e {
-            Drawn::Device { text } => Some(text.clone()),
+            Drawn::Device { text, .. } => Some(text.clone()),
             _ => None,
         });
         assert_eq!(heading, Some(format!("{}…", "d".repeat(43))));
@@ -786,6 +807,15 @@ const EXAMPLE_FOOT: [&str; 9] = [
 fn c_applet_popup_21() {
     puron_testkit::limit("C-applet.popup-21", LIMIT, || {
         setup();
+        assert_whole_popups();
+    });
+}
+
+/// The whole popup of each machine shape of the fixtures, string for
+/// string, in Fahrenheit with the pins of a new install. The strings
+/// carry each entry's kind, texts and check mark, and none of its look.
+fn assert_whole_popups() {
+    {
         let foot = &EXAMPLE_FOOT;
         let tree = |head: &[&str]| -> Vec<String> {
             head.iter()
@@ -882,6 +912,54 @@ fn c_applet_popup_21() {
             new_install(&cpu_set("no-cpu")),
             plain(&["Temperature", "  iwlwifi", "[x] temp1 84°F"]),
         );
+    }
+}
+
+/// The look adds nothing to what the popup holds: the whole popup of each
+/// machine shape, written without its look, is the one that
+/// `c_applet_popup_21` expects. On the plan of the drive set `example`
+/// every entry answers a click as before: a line pins its identity, a
+/// heading or a separator does nothing, "Settings" and "About" show their
+/// pages, and the popup stays open each time.
+#[test]
+fn c_applet_popup_55() {
+    puron_testkit::limit("C-applet.popup-55", LIMIT, || {
+        setup();
+        assert_whole_popups();
+        let s = Settings {
+            temperature_unit: TemperatureUnit::Fahrenheit,
+            ..Settings::default()
+        };
+        let raw = drive_set("example");
+        let shown = menu::shown(&raw, &s);
+        let m = menu::menu(&shown, &s, Report::Answered, None, false);
+        let plan = plan_of(&m, &shown.new_install_pins());
+        let open = |event: Option<Event>| Reply {
+            event,
+            close: false,
+        };
+        for e in &plan.entries {
+            let (want, message) = match e {
+                Drawn::Line(l) => (
+                    open(Some(Event::PinClick(l.identity.clone()))),
+                    Some(Clicked::Line(l.identity.clone())),
+                ),
+                Drawn::Section { .. } | Drawn::Device { .. } | Drawn::Separator => {
+                    (open(None), None)
+                }
+                Drawn::SettingsLink { .. } => {
+                    (open(Some(Event::Settings)), Some(Clicked::SettingsLink))
+                }
+                Drawn::HomepageLink { .. } => {
+                    (open(Some(Event::About)), Some(Clicked::HomepageLink))
+                }
+                Drawn::Message { .. } => panic!("a message in a popup with readings"),
+            };
+            assert_eq!(popup::click(e), want, "click on {e:?}");
+            if let Some(message) = message {
+                assert_eq!(popup::clicked(&plan, message), want, "clicked {e:?}");
+            }
+        }
     });
 }
 
@@ -1096,7 +1174,9 @@ fn c_applet_popup_26() {
             let mut sim = simulate_at(&plan, view.popup_width(&place));
             let line = bounds(&mut sim, popup::entry_id(i));
             let value = element(&mut sim, i, "value");
-            let edge = right(&line) - applet::menu_control_padding().right;
+            // The line's rectangle is its content inside the padding of its
+            // card item.
+            let edge = right(&line);
             assert!(
                 near(right(&value), edge, 0.5),
                 "{want}: value right {}, content edge {edge}",
@@ -1110,9 +1190,9 @@ fn c_applet_popup_26() {
 
 /// The popup of the set `kinds` of icons.json, which has temperatures of
 /// every kind of device: the section Temperature keeps the thermometer,
-/// whatever devices its lines measure, and its lines carry no icon; the
-/// device icons show on the panel only. The other sections keep their
-/// class icons.
+/// whatever devices its lines measure, and its lines carry no icon; a
+/// device's icon shows on the panel and beside the device's heading only.
+/// The other sections keep their class icons.
 #[test]
 fn c_applet_popup_27() {
     puron_testkit::limit("C-applet.popup-27", LIMIT, || {
@@ -1125,7 +1205,7 @@ fn c_applet_popup_27() {
             .entries
             .iter()
             .filter_map(|e| match e {
-                Drawn::Section { text, icon } => Some((text.as_str(), *icon)),
+                Drawn::Section { text, icon, .. } => Some((text.as_str(), *icon)),
                 _ => None,
             })
             .collect();

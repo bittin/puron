@@ -362,9 +362,10 @@ fn c_tests_47() {
 
 /// The last entry of the About plan of version 1.6.0, the Debian package
 /// and the source set `all` is "Copy details" drawn as libcosmic's accent
-/// button. Drawn at the narrowest and the widest popup, the button reaches
-/// from 24 px right of the popup's left edge to 24 px left of its right
-/// edge, and its text is centered in it within 1 px.
+/// button; the view takes the button's class from the plan. Drawn at the
+/// narrowest and the widest popup, the button's own rectangle reaches from
+/// 24 px right of the popup's left edge to 24 px left of its right edge,
+/// and its text is centered in it within 1 px.
 #[test]
 fn c_tests_53() {
     use cosmic::iced::Size;
@@ -403,7 +404,7 @@ fn c_tests_53() {
                     .bounds()
             };
             let root = find(Id::new("root"));
-            let button = find(popup::entry_id(last));
+            let button = find(popup::element_id(last, "button"));
             let text = find(popup::element_id(last, "text"));
             let side = f32::from(popup::PAGE_SIDE_PADDING);
             assert!(

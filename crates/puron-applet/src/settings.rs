@@ -15,7 +15,6 @@
 //! made by another program is, so a change is never applied twice and a
 //! store that fails is never applied.
 
-use cosmic::iced::alignment::{Horizontal, Vertical};
 use cosmic::iced::widget::text::Wrapping;
 use cosmic::iced::{Alignment, Length};
 use cosmic::widget::{
@@ -780,38 +779,26 @@ fn control<'a>(n: usize, c: &'a Kind) -> cosmic::Element<'a, Clicked> {
 /// and 24, so that the labels line up with the texts in the About page's
 /// cards.
 const ITEM_PADDING: [f32; 2] = [6.0, 14.0];
-/// The side in px of a section's icon tile.
-pub const TILE: f32 = 28.0;
-/// The side in px of the icon in a tile.
-const TILE_ICON: u16 = 16;
-/// The space in px between a tile and its heading text.
-const TILE_GAP: f32 = 10.0;
 /// The side in px of the dot in front of a state line.
 pub const DOT: f32 = 6.0;
 
-/// Section `s`'s heading (counted from 1): its tile, then its text. The
-/// tile is `tile-<s>`, its icon `tile-icon-<s>` and the text
-/// `heading-<s>`.
+/// Section `s`'s heading (counted from 1): its tile, then its text, as the
+/// section headings of the temperatures are drawn. The tile is
+/// `tile-<s>`, its icon `tile-icon-<s>` and the text `heading-<s>`.
 fn heading_block<'a>(s: usize, sec: &'a Section) -> cosmic::Element<'a, Clicked> {
-    let role = sec.role;
-    let tile = container(
-        container(look::tinted_icon(sec.icon, TILE_ICON, role)).id(id(format!("tile-icon-{s}"))),
-    )
-    .id(id(format!("tile-{s}")))
-    .width(Length::Fixed(TILE))
-    .height(Length::Fixed(TILE))
-    .align_x(Horizontal::Center)
-    .align_y(Vertical::Center)
-    .class(cosmic::theme::Container::custom(move |t| {
-        look::tile(role, t)
-    }));
+    let tile = look::icon_tile(
+        sec.icon,
+        sec.role,
+        id(format!("tile-{s}")),
+        id(format!("tile-icon-{s}")),
+    );
     row::with_children(vec![
-        tile.into(),
+        tile,
         container(text::heading(sec.heading.as_str()))
             .id(id(format!("heading-{s}")))
             .into(),
     ])
-    .spacing(TILE_GAP)
+    .spacing(look::TILE_GAP)
     .align_y(Alignment::Center)
     .into()
 }
@@ -819,6 +806,10 @@ fn heading_block<'a>(s: usize, sec: &'a Section) -> cosmic::Element<'a, Clicked>
 /// Item `n`'s label with its state line under it, 2 px apart: a dot and,
 /// 6 px after it, the state text, both in the state's color. The block is
 /// `label-<n>`, the state line `state-<n>` and the dot `dot-<n>`.
+///
+/// The block fills the room that its row leaves beside the control, as
+/// libcosmic's own label does, so the row lays out the control first and a
+/// long label or state text wraps instead of squeezing the switch.
 fn label_block<'a>(n: usize, label: &'a str, state: &StateLine) -> cosmic::Element<'a, Clicked> {
     let role = state.role;
     let dot = container(
@@ -844,6 +835,7 @@ fn label_block<'a>(n: usize, label: &'a str, state: &StateLine) -> cosmic::Eleme
         .spacing(2),
     )
     .id(id(format!("label-{n}")))
+    .width(Length::Fill)
     .into()
 }
 
@@ -898,7 +890,6 @@ pub fn view<'a>(plan: &'a Plan) -> cosmic::Element<'a, Clicked> {
                             .control(control(n, &it.control)),
                         Some(state) => settings::item_row(vec![
                             label_block(n, &it.label, state),
-                            Space::new().width(Length::Fill).into(),
                             control(n, &it.control),
                         ]),
                     };

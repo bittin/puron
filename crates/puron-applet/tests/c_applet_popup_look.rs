@@ -183,9 +183,12 @@ fn temperature_heading(plan: &popup::Plan) -> usize {
         .expect("a Temperature heading")
 }
 
-/// The temperatures drawn at the narrowest and the widest popup: the icon
+/// The temperatures drawn at the narrowest and the widest popup: the tile
 /// of the section heading "Temperature" starts 24 px right of the popup's
-/// left edge, and every line's value ends 24 px left of its right edge.
+/// left edge; each card reaches from 24 px right of the popup's left edge
+/// to 24 px left of its right edge; and every line's value ends 38 px left
+/// of the popup's right edge, the side padding and the 14 px of the line's
+/// padding in its card.
 #[test]
 fn c_applet_popup_44__readings() {
     puron_testkit::limit("C-applet.popup-44", LIMIT, || {
@@ -195,17 +198,30 @@ fn c_applet_popup_44__readings() {
         for width in [popup::WIDTH, popup::MAX_WIDTH] {
             let mut s = sim(popup::view(&plan), width);
             let root = rect(&mut s, Id::new("root"));
-            let icon = rect(&mut s, popup::element_id(heading, "icon"));
-            at_left("Temperature icon", width, icon, root);
+            let tile = rect(&mut s, popup::element_id(heading, "tile"));
+            at_left("Temperature tile", width, tile, root);
             let mut lines = 0;
+            let mut cards = 0;
             for (i, e) in plan.entries.iter().enumerate() {
                 if let Drawn::Line(l) = e {
                     let value = rect(&mut s, popup::element_id(i, "value"));
-                    at_right(&format!("value of {}", l.text), width, value, root);
+                    let edge = root.x + root.width - 38.0;
+                    assert!(
+                        near(value.x + value.width, edge),
+                        "width {width}: value of {} ends at {} against {edge}",
+                        l.text,
+                        value.x + value.width
+                    );
                     lines += 1;
+                    cards = cards.max(l.card);
                 }
             }
             assert!(lines > 0, "no line drawn");
+            for n in 1..=cards {
+                let card = rect(&mut s, popup::card_id(n));
+                at_left(&format!("card {n}"), width, card, root);
+                at_right(&format!("card {n}"), width, card, root);
+            }
         }
     });
 }
@@ -243,26 +259,26 @@ fn c_applet_popup_44__about() {
                 at_left(&format!("{place:?}"), width, r, root);
                 at_right(&format!("{place:?}"), width, r, root);
             }
-            let r = rect(&mut s, popup::entry_id(copy));
+            let r = rect(&mut s, popup::element_id(copy, "button"));
             at_left("Copy details", width, r, root);
             at_right("Copy details", width, r, root);
         }
     });
 }
 
-/// The left edge of the "Temperature" heading's icon on the temperatures
+/// The left edge of the "Temperature" heading's tile on the temperatures
 /// drawn `width` px wide, relative to the popup's left edge.
-fn temperature_icon_x(width: f32) -> f32 {
+fn temperature_tile_x(width: f32) -> f32 {
     let plan = readings_plan();
     let i = temperature_heading(&plan);
     let mut s = sim(popup::view(&plan), width);
     let root = rect(&mut s, Id::new("root"));
-    rect(&mut s, popup::element_id(i, "icon")).x - root.x
+    rect(&mut s, popup::element_id(i, "tile")).x - root.x
 }
 
 /// The Settings page drawn at the narrowest and the widest popup: Back's
 /// icon and each section's icon tile start 24 px right of the popup's
-/// left edge, each tile where the temperatures' "Temperature" icon starts
+/// left edge, each tile where the temperatures' "Temperature" tile starts
 /// at the same width, and each section's card reaches from 24 px right of
 /// the popup's left edge to 24 px left of its right edge.
 #[test]
@@ -271,7 +287,7 @@ fn c_applet_popup_44__settings() {
         common::start_in_english();
         let plan = settings_plan();
         for width in [popup::WIDTH, popup::MAX_WIDTH] {
-            let readings = temperature_icon_x(width);
+            let readings = temperature_tile_x(width);
             let mut s = sim(settings::view(&plan), width);
             let root = rect(&mut s, Id::new("root"));
             let back = rect(&mut s, settings::id("back-icon"));
@@ -281,7 +297,7 @@ fn c_applet_popup_44__settings() {
                 at_left(&format!("tile {n}"), width, tile, root);
                 assert!(
                     near(tile.x - root.x, readings),
-                    "width {width}: tile {n} at {} against the Temperature icon at {readings}",
+                    "width {width}: tile {n} at {} against the Temperature tile at {readings}",
                     tile.x - root.x
                 );
                 let card = rect(&mut s, settings::id(format!("card-{n}")));
@@ -662,7 +678,9 @@ fn expected(role: Role, theme: &Theme) -> Option<Color> {
         }
         Role::Success => t.success_color(),
         Role::Warning => t.warning_color(),
+        Role::Destructive => t.destructive_color(),
         Role::Accent => t.accent_text_color(),
+        Role::Orange => p.accent_orange,
         Role::Yellow => p.accent_yellow,
         Role::Purple => p.accent_purple,
         Role::Indigo => p.accent_indigo,
@@ -671,15 +689,39 @@ fn expected(role: Role, theme: &Theme) -> Option<Color> {
     Some(c.into())
 }
 
-/// Under libcosmic's built-in dark and light themes, each role gives the
-/// color of the theme that the table of roles names, and the default role
-/// gives none; every other role has a different color in the dark theme
-/// than in the light one, so no role is a fixed color.
+/// Under libcosmic's built-in dark and light themes, each of the eleven
+/// roles gives the color of the theme that the table of roles names, and
+/// the default role gives none; every other role has a different color in
+/// the dark theme than in the light one, so no role is a fixed color; and
+/// the red of a hot temperature differs from the color of a warm one.
 #[test]
 fn c_applet_popup_47() {
     puron_testkit::limit("C-applet.popup-47", LIMIT, || {
         let dark = Theme::dark();
         let light = Theme::light();
+        assert_eq!(
+            ROLES,
+            [
+                Role::Default,
+                Role::Muted,
+                Role::Success,
+                Role::Warning,
+                Role::Destructive,
+                Role::Accent,
+                Role::Orange,
+                Role::Yellow,
+                Role::Purple,
+                Role::Indigo,
+                Role::Green,
+            ]
+        );
+        for theme in [&dark, &light] {
+            assert_ne!(
+                look::color(Role::Destructive, theme),
+                look::color(Role::Warning, theme),
+                "hot and warm alike"
+            );
+        }
         for role in ROLES {
             for (name, theme) in [("dark", &dark), ("light", &light)] {
                 assert_eq!(
