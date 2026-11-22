@@ -69,10 +69,29 @@ fn tags(list: &[&str]) -> Vec<LanguageIdentifier> {
 }
 
 /// The English catalog holds exactly the messages and texts of
-/// `en.tsv`, in the same order.
+/// `en.tsv`, in the same order. It must also parse as Fluent with no
+/// error and hold only messages and comments: the loader skips a line it
+/// cannot parse, so a broken line could hide in the file while the dump
+/// stays right, and a term would be an entry that no lookup by ID
+/// reaches.
 #[test]
 fn c_i18n_1() {
     puron_testkit::limit("C-i18n-1", LIMIT, || {
+        let file = i18n::Catalogs::get("en/puron.ftl").expect("en/puron.ftl is embedded");
+        let source = std::str::from_utf8(&file.data).expect("en/puron.ftl is UTF-8");
+        let resource = match fluent_syntax::parser::parse(source) {
+            Ok(r) => r,
+            Err((_, errors)) => panic!("en/puron.ftl does not parse: {errors:?}"),
+        };
+        for entry in resource.body {
+            match entry {
+                fluent_syntax::ast::Entry::Message(_)
+                | fluent_syntax::ast::Entry::Comment(_)
+                | fluent_syntax::ast::Entry::GroupComment(_)
+                | fluent_syntax::ast::Entry::ResourceComment(_) => {}
+                other => panic!("en/puron.ftl holds an entry that is not a message: {other:?}"),
+            }
+        }
         let loader = i18n::new_loader();
         let en: LanguageIdentifier = "en".parse().unwrap();
         i18n::choose(&loader, &i18n::Catalogs, std::slice::from_ref(&en));
@@ -244,68 +263,11 @@ fn c_i18n_9() {
     });
 }
 
-/// Returns the message IDs of a catalog, and fails unless the catalog
-/// parses as Fluent with no error and holds only messages and comments.
-/// A term would be an entry that no lookup by ID reaches, so it is
-/// refused like a syntax error.
-fn catalog_ids(name: &str) -> Vec<String> {
-    let file = i18n::Catalogs::get(name).unwrap_or_else(|| panic!("{name} is embedded"));
-    let source =
-        std::str::from_utf8(&file.data).unwrap_or_else(|e| panic!("{name} is not UTF-8: {e}"));
-    let resource = match fluent_syntax::parser::parse(source) {
-        Ok(r) => r,
-        Err((_, errors)) => panic!("{name} does not parse: {errors:?}"),
-    };
-    let mut ids = Vec::new();
-    for entry in resource.body {
-        match entry {
-            fluent_syntax::ast::Entry::Message(m) => ids.push(m.id.name.to_string()),
-            fluent_syntax::ast::Entry::Comment(_)
-            | fluent_syntax::ast::Entry::GroupComment(_)
-            | fluent_syntax::ast::Entry::ResourceComment(_) => {}
-            other => panic!("{name} holds an entry that is not a message: {other:?}"),
-        }
-    }
-    ids
-}
-
-/// Every catalog that the program embeds ships, with no fixed list of
-/// languages. The English catalog must be among them, and each one must
-/// sit at `<language>/puron.ftl` under a valid language tag, parse, and
-/// use only message IDs that the English catalog has: a translation may
-/// leave entries out, which then show in English, but an unknown ID would
-/// be a text that the program never draws.
-#[test]
-fn c_i18n_10() {
-    puron_testkit::limit("C-i18n-10", LIMIT, || {
-        let mut names: Vec<String> = i18n::Catalogs::iter().map(|n| n.to_string()).collect();
-        names.sort();
-        assert!(
-            names.iter().any(|n| n == "en/puron.ftl"),
-            "en/puron.ftl is embedded: {names:?}"
-        );
-        let english = catalog_ids("en/puron.ftl");
-        for name in &names {
-            println!("{name}");
-            let language = match name.split_once('/') {
-                Some((language, "puron.ftl")) => language,
-                _ => panic!("{name} is not <language>/puron.ftl"),
-            };
-            language
-                .parse::<LanguageIdentifier>()
-                .unwrap_or_else(|e| panic!("{name}: {language} is not a language tag: {e}"));
-            for id in catalog_ids(name) {
-                assert!(
-                    english.contains(&id),
-                    "{name} holds {id}, which en/puron.ftl does not have"
-                );
-            }
-        }
-    });
-}
-
 /// Under a German locale, the captured voltage still shows as "+8.49V",
 /// with a decimal point: the number's text does not follow the locale.
+/// `LANGUAGE=en` makes the program's start choose English, so that the
+/// test reads no shipped German text; the C library's number format
+/// would still follow `LC_ALL`.
 #[test]
 fn c_i18n_13() {
     puron_testkit::limit("C-i18n-13", LIMIT, || {
@@ -313,7 +275,11 @@ fn c_i18n_13() {
             puron_testkit::host_locale("de_DE.UTF-8");
             return child(
                 "c_i18n_13",
-                &[("LC_ALL", "de_DE.UTF-8"), ("LANG", "de_DE.UTF-8")],
+                &[
+                    ("LC_ALL", "de_DE.UTF-8"),
+                    ("LANG", "de_DE.UTF-8"),
+                    ("LANGUAGE", "en"),
+                ],
             );
         }
         puron_applet::start();
@@ -362,5 +328,46 @@ fn c_i18n_14() {
             "EO °C"
         );
         assert_eq!(i18n::panel_value(None), "EO ⚠");
+    });
+}
+
+/// Esperanto is asked for (map E1) and its catalog has one fault in each
+/// of six messages, an unknown message and a term, and comes with a copy
+/// in a folder whose name is no language tag. Esperanto is still chosen;
+/// each faulty message shows its English text, every other message its
+/// Esperanto one, and no text holds a brace or the loader's note for a
+/// message it cannot find.
+#[test]
+fn c_i18n_16() {
+    puron_testkit::limit("C-i18n-16", LIMIT, || {
+        if !is_child() {
+            return child("c_i18n_16", loc::env("E1"));
+        }
+        assert_eq!(
+            i18n::start_with(test_catalog::eo_broken(), env_var).to_string(),
+            "eo"
+        );
+        let faulty = [
+            "link-homepage",
+            "no-value",
+            "about-back",
+            "about-license",
+            "about-links",
+            "about-package",
+        ];
+        for (id, en) in english() {
+            let got = i18n::text(&id);
+            let want = if faulty.contains(&id.as_str()) {
+                en
+            } else {
+                format!("EO {en}")
+            };
+            assert_eq!(got, want, "{id}");
+            assert!(
+                !got.contains('{') && !got.contains("No localization"),
+                "{id}: {got:?}"
+            );
+        }
+        assert_eq!(i18n::value_text(None), "N/A");
     });
 }

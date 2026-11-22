@@ -7,12 +7,14 @@
 # its run 30 s), and 120 s for the others. c_applet_panel_15.sh runs with
 # no outer limit (t=0 disables timeout): the release build of its
 # make install has none, and the script limits its later checks to 120 s
-# itself.
+# itself. tools/catalog-report.sh prints one information line for each
+# translation under i18n/ and never fails; tools/c_i18n_10.sh and
+# tools/c_i18n_17.sh check that no translation can make this target fail.
 SCRIPT_CHECKS := tools/lint-a.sh tools/c_tests_1.sh tools/c_tests_2.sh tools/c_tests_3.sh \
     tools/c_tests_6.sh tools/c_src_registry_7.sh \
     tools/c_engine_15.sh tools/c_i18n_15.sh \
     tools/c_tests_7.sh tools/c_applet_panel_10.sh tools/c_applet_app_19.sh \
-    tools/c_i18n_11.sh \
+    tools/c_i18n_11.sh tools/catalog-report.sh tools/c_i18n_10.sh tools/c_i18n_17.sh \
     tools/read-only-run.sh tools/c_applet_panel_15.sh \
     tools/c_tests_18.sh tools/c_tests_19.sh tools/c_tests_20.sh tools/c_tests_21.sh \
     tools/c_tests_22.sh tools/c_tests_23.sh tools/c_tests_24.sh tools/c_tests_25.sh \

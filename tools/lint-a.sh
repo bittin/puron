@@ -4,6 +4,9 @@
 # docs. The patterns are in tools/lint-patterns. Comments are taken from
 # Rust files (// and block comments) and from shell, Makefile, TOML, YAML,
 # Fluent and desktop files (#); docs are README.md, CHANGELOG.md, LICENSE and debian/.
+# Of the catalogs under i18n/, only the English one is read: every other
+# catalog is a translator's file, and nothing a translator writes in it
+# may fail the build.
 # Usage: tools/lint-a.sh [file...]; with no file, every file git knows
 # (tracked or not ignored). Exits 1 and prints file:line for each hit.
 cd "$(dirname "$0")/.." || exit 2
@@ -53,6 +56,8 @@ while IFS= read -r f; do
     crates/*/fixtures/*.sh) k=hash ;;
     crates/*/fixtures/*) continue ;;
     tools/lint-patterns) continue ;;
+    i18n/en/puron.ftl) k=hash ;;
+    i18n/*) continue ;;
     *.rs) k=rust ;;
     *.sh|Makefile|*.toml|*.yml|*.ftl|*.desktop.in|.gitattributes|.gitignore|.githooks/*) k=hash ;;
     README.md|CHANGELOG.md|LICENSE|debian/*) k=doc ;;

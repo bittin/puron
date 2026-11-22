@@ -1,7 +1,9 @@
 //! `puron_applet::start` leaves the C library's locale at `C`, even with
 //! `LC_ALL` set to `tr_TR.UTF-8` or `de_DE.UTF-8`. Both locales must be
 //! installed on the test machine. Each locale is checked in a fresh run
-//! of this test binary, with the other locale variables removed.
+//! of this test binary, with the other locale variables removed and
+//! `LANGUAGE=en`, so that the start loads English alone and the test
+//! reads no shipped translation.
 
 use std::ffi::CStr;
 
@@ -27,6 +29,7 @@ fn c_i18n_12() {
             }
             let out = cmd
                 .env("LC_ALL", locale)
+                .env("LANGUAGE", "en")
                 .env(CHILD, "1")
                 .output()
                 .expect("run child");

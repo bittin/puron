@@ -185,6 +185,31 @@ expect. The tests do not skip themselves: a test that
 needs something the computer lacks fails, and its message names what is
 missing.
 
+## Translating Puron
+
+Puron shows its texts in the language of your desktop when a
+translation exists, and in English otherwise. Each translation is
+one file, `i18n/<language code>/puron.ftl`, in the Fluent format
+(https://projectfluent.org).
+
+To add a language:
+
+1. Copy `i18n/en/puron.ftl` to `i18n/<language code>/puron.ftl`.
+   The code is the language, such as `de` or `fr`, or the language
+   and the country, such as `pt-BR`, with a hyphen and not an
+   underscore.
+2. Translate the text after each `=`. Keep the name before the `=`
+   as it is, and keep every part in `{ }` as it is: `{" "}` keeps
+   a space that Fluent would otherwise drop.
+3. Translate what you can. A partial file is welcome: each text
+   that it leaves out is shown in English.
+4. Open a pull request.
+
+`make check` prints one line for each translation, with the number
+of texts it translates and any line that Puron cannot read. A
+translation never makes `make check` fail: a text that Puron
+cannot read is shown in English.
+
 ## License
 
 Puron's source files are MIT; see `LICENSE`.
