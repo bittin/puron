@@ -42,6 +42,21 @@
   </branding>
   <content_rating type="oars-1.1"/>
   <releases>
+    <release version="1.6.1" date="2026-11-22">
+      <description>
+        <p>Added</p>
+        <ul>
+          <li>Puron now speaks Swedish, German, Portuguese (Brazil), French, Spanish and Italian: the popup, its settings and its About page are shown in that language when the desktop uses it. A text that a translation lacks is shown in English.</li>
+          <li>Anyone can add a language, and a partial translation is welcome: the section "Translating Puron" of the README says how. A translation that lacks texts never stops Puron from building.</li>
+          <li>Swedish translation by Luna Jernberg (@bittin).</li>
+          <li>The German, Portuguese, French, Spanish and Italian translations, and the Swedish texts of the About page, are machine-assisted; corrections are welcome.</li>
+        </ul>
+        <p>Fixed</p>
+        <ul>
+          <li>The applet's tests pass on a machine whose desktop uses a language other than English: they choose English themselves.</li>
+        </ul>
+      </description>
+    </release>
     <release version="1.6.0" date="2026-11-20">
       <description>
         <p>Added</p>

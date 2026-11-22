@@ -4,6 +4,22 @@ The notable changes of each Puron release. Versions follow
 [Semantic Versioning](https://semver.org/), and the format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [1.6.1] - 2026-11-22
+
+### Added
+
+- Puron now speaks Swedish, German, Portuguese (Brazil), French, Spanish and Italian: the popup, its settings and its
+  About page are shown in that language when the desktop uses it. A text that a translation lacks is shown in English.
+- Anyone can add a language, and a partial translation is welcome: the section "Translating Puron" of the README says
+  how. A translation that lacks texts never stops Puron from building.
+- Swedish translation by Luna Jernberg (@bittin).
+- The German, Portuguese, French, Spanish and Italian translations, and the Swedish texts of the About page, are machine-assisted; corrections are welcome.
+
+### Fixed
+
+- The applet's tests pass on a machine whose desktop uses a language other than English: they choose English
+  themselves.
+
 ## [1.6.0] - 2026-11-20
 
 ### Added
