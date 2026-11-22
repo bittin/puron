@@ -31,3 +31,6 @@ serde_json.workspace = true
 puron-testkit = { workspace = true, features = ["dump", "cfg-writer"] }
 iced_test.workspace = true
 png.workspace = true
+# Parses the shipped catalogs in the catalog test. Pinned to the version
+# that i18n-embed already brings in, so the lock file gains no package.
+fluent-syntax = "=0.12.0"

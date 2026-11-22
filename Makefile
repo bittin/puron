@@ -10,7 +10,7 @@
 # itself.
 SCRIPT_CHECKS := tools/lint-a.sh tools/c_tests_1.sh tools/c_tests_2.sh tools/c_tests_3.sh \
     tools/c_tests_6.sh tools/c_src_registry_7.sh \
-    tools/c_engine_15.sh tools/c_i18n_10.sh tools/c_i18n_15.sh \
+    tools/c_engine_15.sh tools/c_i18n_15.sh \
     tools/c_tests_7.sh tools/c_applet_panel_10.sh tools/c_applet_app_19.sh \
     tools/c_i18n_11.sh \
     tools/read-only-run.sh tools/c_applet_panel_15.sh \
