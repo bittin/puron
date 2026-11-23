@@ -317,7 +317,7 @@ fn section_role(section: Section) -> Role {
     match section {
         Section::Temperature => Role::Orange,
         Section::Fan => Role::Accent,
-        Section::Voltage => Role::Yellow,
+        Section::Voltage => Role::Green,
         Section::Power => Role::Purple,
     }
 }
@@ -330,7 +330,7 @@ fn section_role(section: Section) -> Role {
 /// fan, a voltage or a power reading, which have no heading.
 fn kind_role(kind: IconKind) -> Role {
     match kind {
-        IconKind::CpuTemperature => Role::Yellow,
+        IconKind::CpuTemperature => Role::Orange,
         IconKind::GpuTemperature => Role::Purple,
         IconKind::DriveTemperature | IconKind::MemoryTemperature => Role::Indigo,
         IconKind::WifiTemperature | IconKind::WiredNetworkTemperature => Role::Green,

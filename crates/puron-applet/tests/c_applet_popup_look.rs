@@ -327,7 +327,7 @@ fn c_applet_popup_45() {
             (
                 "Generic Sensor Providers",
                 "puron-cpu-temperature-symbolic",
-                Role::Yellow,
+                Role::Orange,
             ),
             (
                 "GPU Sensor Providers",
@@ -681,7 +681,6 @@ fn expected(role: Role, theme: &Theme) -> Option<Color> {
         Role::Destructive => t.destructive_color(),
         Role::Accent => t.accent_text_color(),
         Role::Orange => p.accent_orange,
-        Role::Yellow => p.accent_yellow,
         Role::Purple => p.accent_purple,
         Role::Indigo => p.accent_indigo,
         Role::Green => p.accent_green,
@@ -689,7 +688,7 @@ fn expected(role: Role, theme: &Theme) -> Option<Color> {
     Some(c.into())
 }
 
-/// Under libcosmic's built-in dark and light themes, each of the eleven
+/// Under libcosmic's built-in dark and light themes, each of the ten
 /// roles gives the color of the theme that the table of roles names, and
 /// the default role gives none; every other role has a different color in
 /// the dark theme than in the light one, so no role is a fixed color; and
@@ -709,7 +708,6 @@ fn c_applet_popup_47() {
                 Role::Destructive,
                 Role::Accent,
                 Role::Orange,
-                Role::Yellow,
                 Role::Purple,
                 Role::Indigo,
                 Role::Green,

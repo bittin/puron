@@ -208,7 +208,7 @@ fn c_applet_popup_49() {
             [
                 ("Temperature", "puron-temperature-symbolic", Role::Orange),
                 ("Fan", "puron-fan-symbolic", Role::Accent),
-                ("Voltage", "puron-voltage-symbolic", Role::Yellow),
+                ("Voltage", "puron-voltage-symbolic", Role::Green),
                 ("Power", "puron-voltage-symbolic", Role::Purple),
             ]
         );
@@ -233,7 +233,7 @@ fn c_applet_popup_50() {
             (
                 "coretemp-isa-0000",
                 "puron-cpu-temperature-symbolic",
-                Role::Yellow,
+                Role::Orange,
             ),
             (
                 "amdgpu-pci-0300",
@@ -275,7 +275,7 @@ fn c_applet_popup_50() {
             devices(&plan)[0],
             (
                 "puron-cpu-temperature-symbolic",
-                Role::Yellow,
+                Role::Orange,
                 "@cpu".to_string()
             )
         );

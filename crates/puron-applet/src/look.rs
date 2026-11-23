@@ -50,11 +50,9 @@ pub enum Role {
     /// section Display Options, the section Fan and the check mark of a
     /// pinned line.
     Accent,
-    /// The section Temperature.
+    /// The section Temperature, the Settings section Generic Sensor
+    /// Providers and the CPU.
     Orange,
-    /// The Settings section Generic Sensor Providers, the section Voltage
-    /// and the CPU.
-    Yellow,
     /// The Settings section GPU Sensor Providers, the section Power and a
     /// GPU.
     Purple,
@@ -62,12 +60,13 @@ pub enum Role {
     /// module. Not the palette's blue, because that is the default accent
     /// and so the color of Display Options.
     Indigo,
-    /// The Settings section Show Sensors and a network card.
+    /// The Settings section Show Sensors, the section Voltage and a
+    /// network card.
     Green,
 }
 
 /// Every role, in the order of the enum.
-pub const ROLES: [Role; 11] = [
+pub const ROLES: [Role; 10] = [
     Role::Default,
     Role::Muted,
     Role::Success,
@@ -75,7 +74,6 @@ pub const ROLES: [Role; 11] = [
     Role::Destructive,
     Role::Accent,
     Role::Orange,
-    Role::Yellow,
     Role::Purple,
     Role::Indigo,
     Role::Green,
@@ -105,7 +103,6 @@ pub fn color(role: Role, theme: &cosmic::Theme) -> Option<Color> {
         Role::Destructive => t.destructive_color(),
         Role::Accent => t.accent_text_color(),
         Role::Orange => p.accent_orange,
-        Role::Yellow => p.accent_yellow,
         Role::Purple => p.accent_purple,
         Role::Indigo => p.accent_indigo,
         Role::Green => p.accent_green,

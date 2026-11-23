@@ -264,7 +264,7 @@ const SECTIONS: [(usize, usize); 5] = [(1, 10), (11, 12), (13, 13), (14, 16), (1
 /// kinds; the monitor comes from the COSMIC icon theme.
 pub const SECTION_LOOKS: [(&str, Role); 5] = [
     ("video-display-symbolic", Role::Accent),
-    ("puron-cpu-temperature-symbolic", Role::Yellow),
+    ("puron-cpu-temperature-symbolic", Role::Orange),
     ("puron-gpu-temperature-symbolic", Role::Purple),
     ("drive-harddisk-system-symbolic", Role::Indigo),
     ("puron-temperature-symbolic", Role::Green),
