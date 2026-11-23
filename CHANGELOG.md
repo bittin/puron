@@ -4,6 +4,32 @@ The notable changes of each Puron release. Versions follow
 [Semantic Versioning](https://semver.org/), and the format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [1.7.0] - 2026-11-23
+
+### Added
+
+- Each temperature in the popup is colored by how hot it runs: in the normal text color while it is cool, in the
+  theme's warning color when it runs warm, and in the theme's red when it runs hot. The limits suit each kind of
+  device, so a CPU or a graphics card may run warmer than a drive before it changes color, and a temperature has the
+  same color whether it is shown in Celsius or in Fahrenheit. Only the value is colored, never the name; fan, voltage
+  and power readings keep the normal text color.
+- Each device name in the popup has the icon of its kind of device beside it, such as the CPU, the graphics card, a
+  drive, the Wi-Fi card, a wired network card or a memory module, in that kind's color.
+
+### Changed
+
+- The readings in the popup now have the look of the Settings and About pages, in the desktop theme's colors, so that
+  a light and a dark theme both work. Each section heading has a small colored tile with the section's icon. Each
+  device's readings sit in a rounded card with a thin divider between two readings, and the fan, voltage and power
+  readings of a section share one card. The readings, their order, their texts and what a click does stay the same,
+  and so does the panel.
+- The check mark of a pinned reading is in the theme's accent color, and "Settings" and "About" each have a small icon
+  beside their text.
+- On the Settings page, the tile of the section "Generic Sensor Providers" now has the same color as the Temperature
+  tile in the popup.
+- On the Settings page, a long label or state line under a sensor provider's switch now wraps instead of squeezing
+  the switch.
+
 ## [1.6.1] - 2026-11-22
 
 ### Added
